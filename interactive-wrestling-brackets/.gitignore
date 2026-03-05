@@ -1,0 +1,14 @@
+# Maven build output
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Java / OS noise
+*.class
+.DS_Store
+Thumbs.db
