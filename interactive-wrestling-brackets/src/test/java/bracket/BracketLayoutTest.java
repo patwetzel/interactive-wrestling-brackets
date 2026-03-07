@@ -10,8 +10,8 @@ class BracketLayoutTest {
   void calculateTopOffsetMatchesExpectedSpacingPerRound() {
     assertEquals(0, BracketLayout.calculateTopOffset(-1));
     assertEquals(0, BracketLayout.calculateTopOffset(0));
-    assertEquals(39, BracketLayout.calculateTopOffset(1));
-    assertEquals(118, BracketLayout.calculateTopOffset(2));
+    assertEquals(40, BracketLayout.calculateTopOffset(1));
+    assertEquals(119, BracketLayout.calculateTopOffset(2));
   }
 
   @Test

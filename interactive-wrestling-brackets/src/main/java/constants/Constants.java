@@ -4,8 +4,8 @@ import lombok.experimental.UtilityClass;
 
 import java.awt.Color;
 import java.awt.Dimension;
-import java.util.List;
 import java.nio.file.Path;
+import java.util.List;
 
 @UtilityClass
 public class Constants {
@@ -26,6 +26,7 @@ public class Constants {
   public static final int ROUND_HEADER_BOTTOM_SPACING = 12;
   public static final int MATCH_BUTTON_GAP = 3;
   public static final int CONNECTOR_MIN_HORIZONTAL_SEGMENT = 24;
+  public static final int CONNECTOR_MIN_FINAL_SEGMENT = 10;
   public static final float ROUND_HEADER_FONT_SIZE = 14f;
   public static final float BUTTON_FONT_SIZE = 11f;
   public static final Color MATCH_CARD_BORDER_COLOR = new Color(210, 210, 210);
@@ -38,5 +39,4 @@ public class Constants {
     Path.of("interactive-wrestling-brackets", "src", "test", "java", "SeedingTest.xlsx")
   );
   public static final String SHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-
 }

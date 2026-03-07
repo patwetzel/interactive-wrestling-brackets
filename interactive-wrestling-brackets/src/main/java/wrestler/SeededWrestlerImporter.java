@@ -21,6 +21,11 @@ import java.util.zip.ZipFile;
 
 public final class SeededWrestlerImporter {
   private static final String SHEET_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  private static final String HEADER_SEED = "seed";
+  private static final String HEADER_WRESTLER = "wrestler";
+  private static final String HEADER_TEAM = "team";
+  private static final String HEADER_WINS = "wins";
+  private static final String HEADER_LOSSES = "losses";
 
   public List<String> readSheetNames(Path filePath) throws Exception {
     try (ZipFile zipFile = new ZipFile(filePath.toFile())) {
@@ -67,17 +72,17 @@ public final class SeededWrestlerImporter {
       Element headerRow = (Element) rowNodes.item(0);
       Map<String, String> headerToColumn = extractHeaderToColumnMap(headerRow, sharedStrings);
 
-      String seedColumn = headerToColumn.get("seed");
-      String wrestlerColumn = headerToColumn.get("wrestler");
-      String teamColumn = headerToColumn.get("team");
-      String winsColumn = headerToColumn.get("wins");
-      String lossesColumn = headerToColumn.get("losses");
+      String seedColumn = headerToColumn.get(HEADER_SEED);
+      String wrestlerColumn = headerToColumn.get(HEADER_WRESTLER);
+      String teamColumn = headerToColumn.get(HEADER_TEAM);
+      String winsColumn = headerToColumn.get(HEADER_WINS);
+      String lossesColumn = headerToColumn.get(HEADER_LOSSES);
 
       if (seedColumn == null || wrestlerColumn == null || teamColumn == null || winsColumn == null || lossesColumn == null) {
         throw new IllegalStateException("Expected headers: Seed, Wrestler, Team, Wins, Losses.");
       }
 
-      List<Wrestler> result = new ArrayList<>();
+      List<Wrestler> result = new ArrayList<>(Math.max(0, rowNodes.getLength() - 1));
       for (int i = 1; i < rowNodes.getLength(); i++) {
         Element row = (Element) rowNodes.item(i);
         Map<String, String> cells = extractCellValues(row, sharedStrings);
@@ -104,8 +109,8 @@ public final class SeededWrestlerImporter {
     Document workbook = readXmlEntry(zipFile, "xl/workbook.xml");
     Document relationships = readXmlEntry(zipFile, "xl/_rels/workbook.xml.rels");
 
-    Map<String, String> relationshipTargets = new HashMap<>();
     NodeList relationshipNodes = relationships.getElementsByTagNameNS("*", "Relationship");
+    Map<String, String> relationshipTargets = new HashMap<>(Math.max(4, relationshipNodes.getLength()));
     for (int i = 0; i < relationshipNodes.getLength(); i++) {
       Element relationship = (Element) relationshipNodes.item(i);
       String id = relationship.getAttribute("Id");
@@ -115,8 +120,8 @@ public final class SeededWrestlerImporter {
       }
     }
 
-    List<SheetMetadata> sheets = new ArrayList<>();
     NodeList sheetNodes = workbook.getElementsByTagNameNS(SHEET_NS, "sheet");
+    List<SheetMetadata> sheets = new ArrayList<>(sheetNodes.getLength());
     for (int i = 0; i < sheetNodes.getLength(); i++) {
       Element sheetElement = (Element) sheetNodes.item(i);
       String name = sheetElement.getAttribute("name");
@@ -162,8 +167,8 @@ public final class SeededWrestlerImporter {
   }
 
   private Map<String, String> extractCellValues(Element row, List<String> sharedStrings) {
-    Map<String, String> cells = new HashMap<>();
     NodeList cellNodes = row.getElementsByTagNameNS(SHEET_NS, "c");
+    Map<String, String> cells = new HashMap<>(Math.max(4, cellNodes.getLength()));
 
     for (int i = 0; i < cellNodes.getLength(); i++) {
       Element cell = (Element) cellNodes.item(i);

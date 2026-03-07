@@ -6,7 +6,7 @@ import match.MatchNode;
 import java.util.List;
 
 @UtilityClass
-public class BracketConnector {
+public final class BracketConnector {
 
   public static void connectRounds(List<MatchNode> currentRound, List<MatchNode> nextRound) {
     for (int i = 0; i < currentRound.size(); i++) {
@@ -20,5 +20,10 @@ public class BracketConnector {
   public static void connectWinner(MatchNode source, MatchNode target, int targetSlot) {
     source.setNextMatch(target);
     source.setNextSlot(targetSlot);
+  }
+
+  public static void connectLoser(MatchNode source, MatchNode target, int targetSlot) {
+    source.setLoserNextMatch(target);
+    source.setLoserNextSlot(targetSlot);
   }
 }

@@ -3,6 +3,7 @@ package bracket;
 import static constants.Constants.*;
 
 import constants.RoundDefinition;
+import constants.BracketSection;
 import match.Match;
 import match.MatchCardFactory;
 import match.MatchNode;
@@ -37,6 +38,36 @@ import java.util.Map;
 import java.util.Optional;
 
 public class Bracket {
+  private static final RoundDefinition[] CONSOLATION_ROUNDS = {
+    RoundDefinition.CONSOLATION_PIGTAIL,
+    RoundDefinition.CONSOLATION_ROUND_1,
+    RoundDefinition.CONSOLATION_ROUND_2,
+    RoundDefinition.CONSOLATION_ROUND_3,
+    RoundDefinition.BLOOD_ROUND,
+    RoundDefinition.BLOOD_ROUND_WINNERS,
+    RoundDefinition.CONSOLATION_SEMIFINALS,
+    RoundDefinition.THIRD_PLACE
+  };
+
+  private static final int[][] ROUND_OF_32_SEED_ORDER = {
+    {17, 16},
+    {9, 24},
+    {25, 8},
+    {5, 28},
+    {21, 12},
+    {13, 20},
+    {29, 4},
+    {3, 30},
+    {19, 14},
+    {11, 22},
+    {27, 6},
+    {7, 26},
+    {23, 10},
+    {15, 18},
+    {31, 2}
+  };
+
+  private static final int THREE_VS_THIRTY_ROUND_OF_32_INDEX = 8;
 
   private final List<Wrestler> wrestlers = new ArrayList<>();
   private final JFrame frame = new JFrame(WINDOW_TITLE);
@@ -231,16 +262,36 @@ public class Bracket {
     buttonPanel.setLayout(new BorderLayout());
 
     bracketBoard = new BracketBoardPanel(bracketNodes);
-    bracketBoard.setLayout(new BoxLayout(bracketBoard, BoxLayout.X_AXIS));
+    bracketBoard.setLayout(new BoxLayout(bracketBoard, BoxLayout.Y_AXIS));
     bracketBoard.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_PANEL_GAP, ROUND_OUTER_PADDING, ROUND_PANEL_GAP));
 
+    final JPanel championshipRow = new JPanel();
+    championshipRow.setOpaque(false);
+    championshipRow.setLayout(new BoxLayout(championshipRow, BoxLayout.X_AXIS));
+    championshipRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+    final JPanel consolationRow = new JPanel();
+    consolationRow.setOpaque(false);
+    consolationRow.setLayout(new BoxLayout(consolationRow, BoxLayout.X_AXIS));
+    consolationRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+    bracketBoard.add(championshipRow);
+    bracketBoard.add(Box.createVerticalStrut(80));
+    bracketBoard.add(consolationRow);
+
     final EnumMap<RoundDefinition, List<MatchNode>> rounds = new EnumMap<>(RoundDefinition.class);
-    for (RoundDefinition round : RoundDefinition.values()) {
-      rounds.put(round, createRoundSection(bracketBoard, round));
+    for (RoundDefinition round : RoundDefinition.championshipRounds()) {
+      rounds.put(round, createRoundSection(championshipRow, round));
     }
 
+    final EnumMap<RoundDefinition, List<MatchNode>> consolationRounds = new EnumMap<>(RoundDefinition.class);
+    for (RoundDefinition round : CONSOLATION_ROUNDS) {
+      consolationRounds.put(round, createConsolationRoundSection(consolationRow, round));
+    }
+    final EnumMap<RoundDefinition, MatchNode> placementMatches = createPlacementStackSection(championshipRow);
+
     seedOpeningMatches(bySeed, rounds.get(RoundDefinition.PIGTAIL), rounds.get(RoundDefinition.ROUND_OF_32));
-    connectRounds(rounds);
+    connectRounds(rounds, consolationRounds, placementMatches);
 
     buttonPanel.add(bracketBoard, BorderLayout.NORTH);
 
@@ -268,45 +319,213 @@ public class Bracket {
     final Match firstRoundTop = roundOf32.get(0).getMatch();
     firstRoundTop.setWrestlerTwo(bySeed.get(1));
 
-    final int[] highSeedOrder = {16, 8, 9, 5, 12, 13, 4, 3, 14, 11, 6, 7, 10, 15, 2};
     for (int i = 1; i < roundOf32.size(); i++) {
-      final int highSeed = highSeedOrder[i - 1];
-      final int lowSeed = 33 - highSeed;
+      final int firstSeed = ROUND_OF_32_SEED_ORDER[i - 1][0];
+      final int secondSeed = ROUND_OF_32_SEED_ORDER[i - 1][1];
       final Match roundMatch = roundOf32.get(i).getMatch();
-      roundMatch.setWrestlerOne(bySeed.get(highSeed));
-      roundMatch.setWrestlerTwo(bySeed.get(lowSeed));
+      roundMatch.setWrestlerOne(bySeed.get(firstSeed));
+      roundMatch.setWrestlerTwo(bySeed.get(secondSeed));
     }
   }
 
-  private void connectRounds(EnumMap<RoundDefinition, List<MatchNode>> rounds) {
+  private void connectRounds(
+    EnumMap<RoundDefinition, List<MatchNode>> rounds,
+    EnumMap<RoundDefinition, List<MatchNode>> consolationRounds,
+    EnumMap<RoundDefinition, MatchNode> placementMatches
+  ) {
     BracketConnector.connectWinner(rounds.get(RoundDefinition.PIGTAIL).get(0), rounds.get(RoundDefinition.ROUND_OF_32).get(0), 1);
     BracketConnector.connectRounds(rounds.get(RoundDefinition.ROUND_OF_32), rounds.get(RoundDefinition.ROUND_OF_16));
     BracketConnector.connectRounds(rounds.get(RoundDefinition.ROUND_OF_16), rounds.get(RoundDefinition.QUARTERFINALS));
     BracketConnector.connectRounds(rounds.get(RoundDefinition.QUARTERFINALS), rounds.get(RoundDefinition.SEMIFINALS));
     BracketConnector.connectRounds(rounds.get(RoundDefinition.SEMIFINALS), rounds.get(RoundDefinition.FINAL));
+    connectConsolationPath(rounds, consolationRounds, placementMatches);
+  }
+
+  private void connectConsolationPath(
+    EnumMap<RoundDefinition, List<MatchNode>> rounds,
+    EnumMap<RoundDefinition, List<MatchNode>> consolationRounds,
+    EnumMap<RoundDefinition, MatchNode> placementMatches
+  ) {
+    final List<MatchNode> roundOf32 = rounds.get(RoundDefinition.ROUND_OF_32);
+    final List<MatchNode> roundOf16 = rounds.get(RoundDefinition.ROUND_OF_16);
+    final List<MatchNode> quarterfinals = rounds.get(RoundDefinition.QUARTERFINALS);
+    final List<MatchNode> semifinals = rounds.get(RoundDefinition.SEMIFINALS);
+
+    final MatchNode consiPigtail = consolationRounds.get(RoundDefinition.CONSOLATION_PIGTAIL).get(0);
+    final List<MatchNode> consRound1 = consolationRounds.get(RoundDefinition.CONSOLATION_ROUND_1);
+    final List<MatchNode> consRound2 = consolationRounds.get(RoundDefinition.CONSOLATION_ROUND_2);
+    final List<MatchNode> consRound3 = consolationRounds.get(RoundDefinition.CONSOLATION_ROUND_3);
+    final List<MatchNode> bloodRound = consolationRounds.get(RoundDefinition.BLOOD_ROUND);
+    final List<MatchNode> bloodRoundWinners = consolationRounds.get(RoundDefinition.BLOOD_ROUND_WINNERS);
+    final List<MatchNode> consSemifinals = consolationRounds.get(RoundDefinition.CONSOLATION_SEMIFINALS);
+    final MatchNode thirdPlace = consolationRounds.get(RoundDefinition.THIRD_PLACE).get(0);
+    final MatchNode fifthPlace = placementMatches.get(RoundDefinition.FIFTH_PLACE);
+    final MatchNode seventhPlace = placementMatches.get(RoundDefinition.SEVENTH_PLACE);
+
+    BracketConnector.connectLoser(rounds.get(RoundDefinition.PIGTAIL).get(0), consiPigtail, 1);
+    BracketConnector.connectLoser(roundOf32.get(THREE_VS_THIRTY_ROUND_OF_32_INDEX), consiPigtail, 2);
+    BracketConnector.connectWinner(consiPigtail, consRound1.get(4), 1);
+
+    for (int i = 0; i < roundOf32.size(); i++) {
+      if (i == THREE_VS_THIRTY_ROUND_OF_32_INDEX) {
+        continue;
+      }
+      BracketConnector.connectLoser(roundOf32.get(i), consRound1.get(i / 2), (i % 2) + 1);
+    }
+
+    for (int i = 0; i < consRound1.size(); i++) {
+      BracketConnector.connectWinner(consRound1.get(i), consRound2.get(i), 1);
+    }
+    for (int i = 0; i < roundOf16.size(); i++) {
+      BracketConnector.connectLoser(roundOf16.get(i), consRound2.get(i), 2);
+    }
+
+    BracketConnector.connectRounds(consRound2, consRound3);
+
+    for (int i = 0; i < consRound3.size(); i++) {
+      BracketConnector.connectWinner(consRound3.get(i), bloodRound.get(i), 1);
+    }
+    for (int i = 0; i < quarterfinals.size(); i++) {
+      BracketConnector.connectLoser(quarterfinals.get(i), bloodRound.get(i), 2);
+    }
+
+    BracketConnector.connectRounds(bloodRound, bloodRoundWinners);
+
+    for (int i = 0; i < bloodRoundWinners.size(); i++) {
+      BracketConnector.connectWinner(bloodRoundWinners.get(i), consSemifinals.get(i), 2);
+      BracketConnector.connectLoser(bloodRoundWinners.get(i), seventhPlace, i + 1);
+    }
+
+    for (int i = 0; i < semifinals.size(); i++) {
+      BracketConnector.connectLoser(semifinals.get(i), consSemifinals.get(i), 1);
+    }
+
+    for (int i = 0; i < consSemifinals.size(); i++) {
+      BracketConnector.connectWinner(consSemifinals.get(i), thirdPlace, (i % 2) + 1);
+      BracketConnector.connectLoser(consSemifinals.get(i), fifthPlace, (i % 2) + 1);
+    }
   }
 
   private List<MatchNode> createRoundSection(JPanel bracketPanel, RoundDefinition round) {
+    return createRoundSection(
+      bracketPanel,
+      round.getDisplayName(),
+      round.getMatchCount(),
+      round.getRoundDepth(),
+      round.isResetButton(),
+      round.getBracketSection()
+    );
+  }
+
+  private List<MatchNode> createConsolationRoundSection(JPanel bracketPanel, RoundDefinition round) {
+    boolean isPlacement = round.isPlacementRound();
+    BracketSection section = round.getBracketSection();
+    int roundDepth = isPlacement ? 0 : round.getRoundDepth();
+    return createRoundSection(bracketPanel, round.getDisplayName(), round.getMatchCount(), roundDepth, false, section);
+  }
+
+  private EnumMap<RoundDefinition, MatchNode> createPlacementStackSection(JPanel bracketPanel) {
+    final JPanel placementPanel = new JPanel();
+    placementPanel.setLayout(new BoxLayout(placementPanel, BoxLayout.Y_AXIS));
+    placementPanel.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
+    placementPanel.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
+    placementPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
+
+    addRoundHeader(placementPanel, "Placement");
+
+    int semiDepth = RoundDefinition.SEMIFINALS.getRoundDepth();
+    int topOffset = BracketLayout.calculateTopOffset(semiDepth);
+    int betweenGap = BracketLayout.calculateBetweenGap(semiDepth);
+    if (topOffset > 0) {
+      placementPanel.add(Box.createVerticalStrut(topOffset));
+    }
+
+    MatchNode fifthPlace = createStandalonePlacementMatchNode();
+    placementPanel.add(createPlacementLabeledNode(RoundDefinition.FIFTH_PLACE.getDisplayName(), fifthPlace));
+    placementPanel.add(Box.createVerticalStrut(Math.max(24, betweenGap - 24)));
+    MatchNode seventhPlace = createStandalonePlacementMatchNode();
+    placementPanel.add(createPlacementLabeledNode(RoundDefinition.SEVENTH_PLACE.getDisplayName(), seventhPlace));
+
+    bracketPanel.add(placementPanel);
+    bracketPanel.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
+
+    EnumMap<RoundDefinition, MatchNode> placementMatches = new EnumMap<>(RoundDefinition.class);
+    placementMatches.put(RoundDefinition.FIFTH_PLACE, fifthPlace);
+    placementMatches.put(RoundDefinition.SEVENTH_PLACE, seventhPlace);
+    return placementMatches;
+  }
+
+  private JPanel createPlacementLabeledNode(String label, MatchNode placementNode) {
+    final JPanel wrapper = new JPanel();
+    wrapper.setOpaque(false);
+    wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.Y_AXIS));
+    wrapper.setAlignmentX(Component.CENTER_ALIGNMENT);
+    wrapper.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, MATCH_CARD_HEIGHT + ROUND_HEADER_HEIGHT + 8));
+
+    final JLabel title = new JLabel(label, SwingConstants.CENTER);
+    title.setFont(title.getFont().deriveFont(Font.BOLD, ROUND_HEADER_FONT_SIZE));
+    final JPanel titleRow = new JPanel(new BorderLayout());
+    titleRow.setOpaque(false);
+    titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+    titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROUND_HEADER_HEIGHT));
+    titleRow.add(title, BorderLayout.CENTER);
+    wrapper.add(titleRow);
+    wrapper.add(Box.createVerticalStrut(4));
+
+    final JPanel cardRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+    cardRow.setOpaque(false);
+    cardRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+    cardRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, MATCH_CARD_HEIGHT));
+    cardRow.add(placementNode.getMatchCard());
+    wrapper.add(cardRow);
+    return wrapper;
+  }
+
+  private MatchNode createStandalonePlacementMatchNode() {
+    final Match match = new Match();
+    final JButton buttonOne = MatchCardFactory.createWrestlerButton();
+    final JButton buttonTwo = MatchCardFactory.createWrestlerButton();
+    final JPanel matchCard = MatchCardFactory.createMatchCard();
+
+    matchCard.add(buttonOne);
+    matchCard.add(Box.createVerticalStrut(MATCH_BUTTON_GAP));
+    matchCard.add(buttonTwo);
+
+    final MatchNode node = new MatchNode(match, buttonOne, buttonTwo, matchCard, BracketSection.PLACEMENT);
+    buttonOne.addActionListener(e -> advanceWinner(node, 1));
+    buttonTwo.addActionListener(e -> advanceWinner(node, 2));
+    bracketNodes.add(node);
+    return node;
+  }
+
+  private List<MatchNode> createRoundSection(
+    JPanel bracketPanel,
+    String roundName,
+    int matchCount,
+    int roundDepth,
+    boolean withResetButton,
+    BracketSection bracketSection
+  ) {
     final JPanel roundPanel = new JPanel();
     roundPanel.setLayout(new BoxLayout(roundPanel, BoxLayout.Y_AXIS));
     roundPanel.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
     roundPanel.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
     roundPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
 
-    addRoundHeader(roundPanel, round.getDisplayName());
-    if (round.isResetButton()) {
+    addRoundHeader(roundPanel, roundName);
+    if (withResetButton) {
       addResetButtonToFinalRound(roundPanel);
       roundPanel.add(Box.createVerticalStrut(ROUND_HEADER_BOTTOM_SPACING));
     }
 
-    final int topOffset = BracketLayout.calculateTopOffset(round.getRoundDepth());
-    final int betweenGap = BracketLayout.calculateBetweenGap(round.getRoundDepth());
+    final int topOffset = BracketLayout.calculateTopOffset(roundDepth);
+    final int betweenGap = BracketLayout.calculateBetweenGap(roundDepth);
     if (topOffset > 0) {
       roundPanel.add(Box.createVerticalStrut(topOffset));
     }
 
     final List<MatchNode> nodes = new ArrayList<>();
-    for (int i = 0; i < round.getMatchCount(); i++) {
+    for (int i = 0; i < matchCount; i++) {
       final Match match = new Match();
 
       final JButton buttonOne = MatchCardFactory.createWrestlerButton();
@@ -318,11 +537,11 @@ public class Bracket {
       matchCard.add(buttonTwo);
 
       roundPanel.add(matchCard);
-      if (i < round.getMatchCount() - 1) {
+      if (i < matchCount - 1) {
         roundPanel.add(Box.createVerticalStrut(betweenGap));
       }
 
-      final MatchNode node = new MatchNode(match, buttonOne, buttonTwo, matchCard);
+      final MatchNode node = new MatchNode(match, buttonOne, buttonTwo, matchCard, bracketSection);
       buttonOne.addActionListener(e -> advanceWinner(node, 1));
       buttonTwo.addActionListener(e -> advanceWinner(node, 2));
 
@@ -375,28 +594,22 @@ public class Bracket {
       return;
     }
 
-    final boolean winnerChanged = source.isCompleted() && source.getWinningSlot() != winningSlot;
-    if (winnerChanged) {
+    if (source.isCompleted() && source.getWinningSlot() != winningSlot) {
+      clearParticipantInTarget(source.getNextMatch(), source.getNextSlot());
+      clearParticipantInTarget(source.getLoserNextMatch(), source.getLoserNextSlot());
       resetDecisionsFrom(source.getNextMatch());
+      resetDecisionsFrom(source.getLoserNextMatch());
     }
 
     source.markWinner(winningSlot);
     refreshMatchNode(source);
 
-    final MatchNode nextMatch = source.getNextMatch();
-    if (nextMatch == null) {
-      repaintBracketBoard();
-      return;
-    }
-
     final Wrestler winner = source.selectedWinner();
-    if (source.getNextSlot() == 1) {
-      nextMatch.getMatch().setWrestlerOne(winner);
-    } else {
-      nextMatch.getMatch().setWrestlerTwo(winner);
-    }
+    final Wrestler loser = source.selectedLoser();
 
-    refreshMatchNode(nextMatch);
+    assignWrestlerToTarget(source.getNextMatch(), source.getNextSlot(), winner);
+    assignWrestlerToTarget(source.getLoserNextMatch(), source.getLoserNextSlot(), loser);
+
     repaintBracketBoard();
   }
 
@@ -407,18 +620,37 @@ public class Bracket {
 
     node.clearDecision();
 
-    final MatchNode next = node.getNextMatch();
-    if (next != null) {
-      if (node.getNextSlot() == 1) {
-        next.getMatch().setWrestlerOne(null);
-      } else {
-        next.getMatch().setWrestlerTwo(null);
-      }
-      resetDecisionsFrom(next);
-      refreshMatchNode(next);
+    MatchNode winnerNext = node.getNextMatch();
+    if (winnerNext != null) {
+      clearParticipantInTarget(winnerNext, node.getNextSlot());
+      resetDecisionsFrom(winnerNext);
+      refreshMatchNode(winnerNext);
+    }
+
+    MatchNode loserNext = node.getLoserNextMatch();
+    if (loserNext != null) {
+      clearParticipantInTarget(loserNext, node.getLoserNextSlot());
+      resetDecisionsFrom(loserNext);
+      refreshMatchNode(loserNext);
     }
 
     refreshMatchNode(node);
+  }
+
+  private void assignWrestlerToTarget(MatchNode target, int slot, Wrestler wrestler) {
+    if (target == null) {
+      return;
+    }
+    if (slot == 1) {
+      target.getMatch().setWrestlerOne(wrestler);
+    } else {
+      target.getMatch().setWrestlerTwo(wrestler);
+    }
+    refreshMatchNode(target);
+  }
+
+  private void clearParticipantInTarget(MatchNode target, int slot) {
+    assignWrestlerToTarget(target, slot, null);
   }
 
   private void refreshMatchNode(MatchNode node) {
@@ -448,3 +680,4 @@ public class Bracket {
     SwingUtilities.invokeLater(Bracket::new);
   }
 }
+
