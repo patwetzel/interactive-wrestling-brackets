@@ -6,6 +6,7 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JPanel;
+import javax.swing.border.LineBorder;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -22,6 +23,15 @@ public class MatchCardFactory {
     button.setMinimumSize(WRESTLER_BUTTON_SIZE);
     button.setMaximumSize(WRESTLER_BUTTON_SIZE);
     button.setAlignmentX(Component.LEFT_ALIGNMENT);
+    button.setBorder(BorderFactory.createCompoundBorder(
+      new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
+      BorderFactory.createEmptyBorder(2, 6, 2, 6)
+    ));
+    button.setBackground(BUTTON_BASE_COLOR);
+    button.setForeground(BUTTON_TEXT_COLOR);
+    button.setFocusPainted(false);
+    button.setOpaque(true);
+    button.setContentAreaFilled(true);
     return button;
   }
 
@@ -30,9 +40,11 @@ public class MatchCardFactory {
     matchCard.setLayout(new BoxLayout(matchCard, BoxLayout.Y_AXIS));
     matchCard.setAlignmentX(Component.LEFT_ALIGNMENT);
     matchCard.setBorder(BorderFactory.createCompoundBorder(
-      BorderFactory.createLineBorder(MATCH_CARD_BORDER_COLOR),
+      new LineBorder(MATCH_CARD_BORDER_COLOR, 1, true),
       BorderFactory.createEmptyBorder(ROUND_INNER_PADDING, ROUND_INNER_PADDING, ROUND_INNER_PADDING, ROUND_INNER_PADDING)
     ));
+    matchCard.setBackground(SURFACE_COLOR);
+    matchCard.setOpaque(true);
     final Dimension cardSize = new Dimension(MATCH_CARD_WIDTH, MATCH_CARD_HEIGHT);
     matchCard.setPreferredSize(cardSize);
     matchCard.setMinimumSize(cardSize);

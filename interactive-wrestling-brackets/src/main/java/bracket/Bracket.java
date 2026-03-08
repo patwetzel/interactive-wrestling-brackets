@@ -22,6 +22,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.border.LineBorder;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -38,9 +39,6 @@ import java.util.Map;
 import java.util.Optional;
 
 public class Bracket {
-
-  private static final int EXPECTED_WRESTLER_COUNT = 33;
-  private static final int BRACKET_ROWS_VERTICAL_GAP = 80;
 
   private static final RoundDefinition[] CONSOLATION_ROUNDS = {
     RoundDefinition.CONSOLATION_PIGTAIL,
@@ -104,22 +102,31 @@ public class Bracket {
     frame.setLayout(new BorderLayout());
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     frame.setLocationRelativeTo(null);
+    frame.getContentPane().setBackground(APP_BACKGROUND_COLOR);
   }
 
   private void setupPanels() {
     final JPanel mainPanel = new JPanel(new BorderLayout());
+    mainPanel.setOpaque(true);
+    mainPanel.setBackground(APP_BACKGROUND_COLOR);
 
-    buttonPanel.setBorder(BorderFactory.createTitledBorder("Wrestlers"));
+    buttonPanel.setBorder(BorderFactory.createEmptyBorder());
     buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+    buttonPanel.setOpaque(true);
+    buttonPanel.setBackground(APP_BACKGROUND_COLOR);
 
     bracketScrollPane.getVerticalScrollBar().setUnitIncrement(SCROLL_UNIT_INCREMENT);
     bracketScrollPane.getVerticalScrollBar().setBlockIncrement(SCROLL_BLOCK_INCREMENT);
     bracketScrollPane.getHorizontalScrollBar().setUnitIncrement(SCROLL_UNIT_INCREMENT);
     bracketScrollPane.getHorizontalScrollBar().setBlockIncrement(SCROLL_BLOCK_INCREMENT);
     bracketScrollPane.setWheelScrollingEnabled(true);
+    bracketScrollPane.setBorder(BorderFactory.createEmptyBorder());
+    bracketScrollPane.getViewport().setBackground(APP_BACKGROUND_COLOR);
 
     mainPanel.add(bracketScrollPane, BorderLayout.CENTER);
     weightTabsPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 8, 4));
+    weightTabsPanel.setOpaque(true);
+    weightTabsPanel.setBackground(APP_BACKGROUND_COLOR);
     mainPanel.add(weightTabsPanel, BorderLayout.SOUTH);
     frame.add(mainPanel, BorderLayout.CENTER);
   }
@@ -164,6 +171,7 @@ public class Bracket {
       final String sheetName = sheetNames.get(i);
       final JButton tabButton = new JButton(sheetName);
       tabButton.addActionListener(e -> loadWeightSheet(sheetName));
+      styleWeightTabButton(tabButton);
       weightTabsPanel.add(tabButton);
       weightTabButtons.add(tabButton);
     }
@@ -210,7 +218,10 @@ public class Bracket {
 
   private void updateWeightTabState() {
     for (JButton tabButton : weightTabButtons) {
-      tabButton.setEnabled(!tabButton.getText().equals(selectedSheetName));
+      final boolean selected = tabButton.getText().equals(selectedSheetName);
+      tabButton.setEnabled(!selected);
+      tabButton.setBackground(selected ? TAB_ACTIVE_COLOR : TAB_IDLE_COLOR);
+      tabButton.setForeground(selected ? TAB_ACTIVE_TEXT_COLOR : TAB_IDLE_TEXT_COLOR);
     }
   }
 
@@ -295,6 +306,7 @@ public class Bracket {
     final BracketBoardPanel board = new BracketBoardPanel(bracketNodes);
     board.setLayout(new BoxLayout(board, BoxLayout.Y_AXIS));
     board.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_PANEL_GAP, ROUND_OUTER_PADDING, ROUND_PANEL_GAP));
+    board.setOpaque(false);
     return board;
   }
 
@@ -558,6 +570,7 @@ public class Bracket {
   private void addRoundHeader(JPanel roundPanel, String roundName) {
     final JLabel header = new JLabel(roundName + ":", SwingConstants.CENTER);
     header.setFont(header.getFont().deriveFont(Font.BOLD, ROUND_HEADER_FONT_SIZE));
+    header.setForeground(BUTTON_TEXT_COLOR);
 
     final JPanel headerRow = new JPanel(new BorderLayout());
     headerRow.setOpaque(false);
@@ -571,6 +584,7 @@ public class Bracket {
 
   private void addResetButtonToFinalRound(JPanel roundPanel) {
     final JButton resetButton = new JButton("Reset Bracket");
+    styleActionButton(resetButton);
     resetButton.addActionListener(e -> {
       if (!initialSeededWrestlers.isEmpty()) {
         if (selectedSheetName != null) {
@@ -586,6 +600,30 @@ public class Bracket {
     centeredRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, resetButton.getPreferredSize().height));
     centeredRow.add(resetButton);
     roundPanel.add(centeredRow);
+  }
+
+  private void styleWeightTabButton(JButton button) {
+    button.setFocusPainted(false);
+    button.setOpaque(true);
+    button.setContentAreaFilled(true);
+    button.setBorder(BorderFactory.createCompoundBorder(
+      new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
+      BorderFactory.createEmptyBorder(4, 12, 4, 12)
+    ));
+    button.setBackground(TAB_IDLE_COLOR);
+    button.setForeground(TAB_IDLE_TEXT_COLOR);
+  }
+
+  private void styleActionButton(JButton button) {
+    button.setFocusPainted(false);
+    button.setOpaque(true);
+    button.setContentAreaFilled(true);
+    button.setBorder(BorderFactory.createCompoundBorder(
+      new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
+      BorderFactory.createEmptyBorder(4, 12, 4, 12)
+    ));
+    button.setBackground(TAB_IDLE_COLOR);
+    button.setForeground(TAB_IDLE_TEXT_COLOR);
   }
 
   private void advanceWinner(MatchNode source, int winningSlot) {
