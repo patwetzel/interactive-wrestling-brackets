@@ -284,6 +284,7 @@ public class Bracket {
 
     final EnumMap<RoundDefinition, List<MatchNode>> rounds = buildChampionshipRounds(championshipRow);
     final EnumMap<RoundDefinition, List<MatchNode>> consolationRounds = buildConsolationRounds(consolationRow);
+    addEmptyRoundColumn(championshipRow);
     final EnumMap<RoundDefinition, MatchNode> placementMatches = createPlacementStackSection(championshipRow);
 
     seedOpeningMatches(bySeed, rounds.get(RoundDefinition.PIGTAIL), rounds.get(RoundDefinition.ROUND_OF_32));
@@ -467,19 +468,11 @@ public class Bracket {
     placementPanel.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
     placementPanel.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
     placementPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
-
-    addRoundHeader(placementPanel, "Placement");
-
-    int semiDepth = RoundDefinition.SEMIFINALS.getRoundDepth();
-    int topOffset = BracketLayout.calculateTopOffset(semiDepth);
-    int betweenGap = BracketLayout.calculateBetweenGap(semiDepth);
-    if (topOffset > 0) {
-      placementPanel.add(Box.createVerticalStrut(topOffset));
-    }
+    placementPanel.add(Box.createVerticalGlue());
 
     MatchNode fifthPlace = createStandalonePlacementMatchNode();
     placementPanel.add(createPlacementLabeledNode(RoundDefinition.FIFTH_PLACE.getDisplayName(), fifthPlace));
-    placementPanel.add(Box.createVerticalStrut(Math.max(24, betweenGap - 24)));
+    placementPanel.add(Box.createVerticalStrut(24));
     MatchNode seventhPlace = createStandalonePlacementMatchNode();
     placementPanel.add(createPlacementLabeledNode(RoundDefinition.SEVENTH_PLACE.getDisplayName(), seventhPlace));
 
@@ -490,6 +483,16 @@ public class Bracket {
     placementMatches.put(RoundDefinition.FIFTH_PLACE, fifthPlace);
     placementMatches.put(RoundDefinition.SEVENTH_PLACE, seventhPlace);
     return placementMatches;
+  }
+
+  private void addEmptyRoundColumn(JPanel row) {
+    final JPanel emptyPanel = new JPanel();
+    emptyPanel.setOpaque(false);
+    emptyPanel.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
+    emptyPanel.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
+    emptyPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
+    row.add(emptyPanel);
+    row.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
   }
 
   private JPanel createPlacementLabeledNode(String label, MatchNode placementNode) {
