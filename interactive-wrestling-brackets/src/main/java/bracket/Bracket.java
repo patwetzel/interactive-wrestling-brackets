@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Optional;
 
 public class Bracket {
+  private static final int ALL_AMERICAN_COUNT = 8;
+
 
   private static final RoundDefinition[] CONSOLATION_ROUNDS = {
     RoundDefinition.CONSOLATION_PIGTAIL,
@@ -85,6 +87,11 @@ public class Bracket {
   private String selectedSheetName;
 
   private BracketBoardPanel bracketBoard;
+  private MatchNode finalMatchNode;
+  private MatchNode thirdPlaceMatchNode;
+  private MatchNode fifthPlaceMatchNode;
+  private MatchNode seventhPlaceMatchNode;
+  private final List<JLabel> allAmericanNodes = new ArrayList<>();
 
   public Bracket() {
     setupUI();
@@ -286,6 +293,7 @@ public class Bracket {
     final EnumMap<RoundDefinition, List<MatchNode>> consolationRounds = buildConsolationRounds(consolationRow);
     addEmptyRoundColumn(championshipRow);
     final EnumMap<RoundDefinition, MatchNode> placementMatches = createPlacementStackSection(championshipRow);
+    bindPlacementRankingNodes(rounds, consolationRounds, placementMatches);
 
     seedOpeningMatches(bySeed, rounds.get(RoundDefinition.PIGTAIL), rounds.get(RoundDefinition.ROUND_OF_32));
     connectRounds(rounds, consolationRounds, placementMatches);
@@ -468,6 +476,10 @@ public class Bracket {
     placementPanel.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
     placementPanel.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
     placementPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
+    allAmericanNodes.clear();
+
+    placementPanel.add(createAllAmericanSection());
+    placementPanel.add(Box.createVerticalStrut(12));
     placementPanel.add(Box.createVerticalGlue());
 
     MatchNode fifthPlace = createStandalonePlacementMatchNode();
@@ -483,6 +495,58 @@ public class Bracket {
     placementMatches.put(RoundDefinition.FIFTH_PLACE, fifthPlace);
     placementMatches.put(RoundDefinition.SEVENTH_PLACE, seventhPlace);
     return placementMatches;
+  }
+
+  private JPanel createAllAmericanSection() {
+    final JPanel section = new JPanel();
+    section.setOpaque(false);
+    section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
+    section.setAlignmentX(Component.CENTER_ALIGNMENT);
+    section.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+
+    final JLabel header = new JLabel("All-Americans", SwingConstants.CENTER);
+    header.setFont(header.getFont().deriveFont(Font.BOLD, ROUND_HEADER_FONT_SIZE));
+    header.setForeground(BUTTON_TEXT_COLOR);
+    final JPanel headerRow = new JPanel(new BorderLayout());
+    headerRow.setOpaque(false);
+    headerRow.setAlignmentX(Component.CENTER_ALIGNMENT);
+    headerRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROUND_HEADER_HEIGHT));
+    headerRow.add(header, BorderLayout.CENTER);
+    section.add(headerRow);
+    section.add(Box.createVerticalStrut(6));
+
+    for (int i = 1; i <= ALL_AMERICAN_COUNT; i++) {
+      final JPanel row = new JPanel();
+      row.setOpaque(false);
+      row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+      row.setAlignmentX(Component.CENTER_ALIGNMENT);
+      row.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
+      row.setMaximumSize(new Dimension(Integer.MAX_VALUE, WRESTLER_BUTTON_SIZE.height));
+      row.add(Box.createHorizontalGlue());
+
+      final JLabel node = new JLabel("TBD", SwingConstants.LEFT);
+      node.setOpaque(true);
+      node.setBackground(BUTTON_BASE_COLOR);
+      node.setForeground(BUTTON_TEXT_COLOR);
+      node.setFont(node.getFont().deriveFont(Font.PLAIN, BUTTON_FONT_SIZE));
+      node.setBorder(BorderFactory.createCompoundBorder(
+        new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
+        BorderFactory.createEmptyBorder(2, 6, 2, 6)
+      ));
+      node.setPreferredSize(WRESTLER_BUTTON_SIZE);
+      node.setMinimumSize(WRESTLER_BUTTON_SIZE);
+      node.setMaximumSize(WRESTLER_BUTTON_SIZE);
+
+      allAmericanNodes.add(node);
+      row.add(node);
+      row.add(Box.createHorizontalGlue());
+      section.add(row);
+      if (i < ALL_AMERICAN_COUNT) {
+        section.add(Box.createVerticalStrut(4));
+      }
+    }
+
+    return section;
   }
 
   private void addEmptyRoundColumn(JPanel row) {
@@ -655,6 +719,7 @@ public class Bracket {
     assignWrestlerToTarget(source.getNextMatch(), source.getNextSlot(), winner);
     assignWrestlerToTarget(source.getLoserNextMatch(), source.getLoserNextSlot(), loser);
 
+    refreshAllAmericanNodes();
     repaintBracketBoard();
   }
 
@@ -727,6 +792,48 @@ public class Bracket {
     if (node.isCompleted()) {
       BracketUiStyler.applyResultColors(node);
     }
+  }
+
+  private void bindPlacementRankingNodes(
+    EnumMap<RoundDefinition, List<MatchNode>> rounds,
+    EnumMap<RoundDefinition, List<MatchNode>> consolationRounds,
+    EnumMap<RoundDefinition, MatchNode> placementMatches
+  ) {
+    finalMatchNode = rounds.get(RoundDefinition.FINAL).get(0);
+    thirdPlaceMatchNode = consolationRounds.get(RoundDefinition.THIRD_PLACE).get(0);
+    fifthPlaceMatchNode = placementMatches.get(RoundDefinition.FIFTH_PLACE);
+    seventhPlaceMatchNode = placementMatches.get(RoundDefinition.SEVENTH_PLACE);
+    refreshAllAmericanNodes();
+  }
+
+  private void refreshAllAmericanNodes() {
+    if (allAmericanNodes.isEmpty()) {
+      return;
+    }
+
+    final Wrestler[] placements = new Wrestler[] {
+      selectedWinner(finalMatchNode),
+      selectedLoser(finalMatchNode),
+      selectedWinner(thirdPlaceMatchNode),
+      selectedLoser(thirdPlaceMatchNode),
+      selectedWinner(fifthPlaceMatchNode),
+      selectedLoser(fifthPlaceMatchNode),
+      selectedWinner(seventhPlaceMatchNode),
+      selectedLoser(seventhPlaceMatchNode)
+    };
+
+    for (int i = 0; i < allAmericanNodes.size() && i < placements.length; i++) {
+      final JLabel node = allAmericanNodes.get(i);
+      node.setText(WrestlerLabelFormatter.format(placements[i]));
+    }
+  }
+
+  private Wrestler selectedWinner(MatchNode node) {
+    return node == null ? null : node.selectedWinner();
+  }
+
+  private Wrestler selectedLoser(MatchNode node) {
+    return node == null ? null : node.selectedLoser();
   }
 
   private void repaintBracketBoard() {
