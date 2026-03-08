@@ -562,6 +562,9 @@ public class Bracket {
       bracketNodes.add(node);
     }
 
+    final Dimension preferred = roundPanel.getPreferredSize();
+    roundPanel.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, preferred.height));
+
     bracketPanel.add(roundPanel);
     bracketPanel.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
     return nodes;
