@@ -24,6 +24,7 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.LineBorder;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -39,8 +40,18 @@ import java.util.Map;
 import java.util.Optional;
 
 public class Bracket {
-  private static final int ALL_AMERICAN_COUNT = 8;
 
+  private static final int ALL_AMERICAN_COUNT = 8;
+  private static final Color ALL_AMERICAN_FIRST_COLOR = new Color(255, 243, 196);
+  private static final Color ALL_AMERICAN_SECOND_COLOR = new Color(236, 240, 243);
+  private static final Color ALL_AMERICAN_THIRD_COLOR = new Color(242, 214, 191);
+  private static final Color ALL_AMERICAN_OTHER_COLOR = new Color(220, 236, 255);
+  private static final Color WEIGHT_TAB_ACTIVE_BG = new Color(222, 234, 255);
+  private static final Color WEIGHT_TAB_IDLE_BG = new Color(248, 250, 253);
+  private static final Color WEIGHT_TAB_ACTIVE_TEXT = new Color(24, 45, 84);
+  private static final Color WEIGHT_TAB_IDLE_TEXT = new Color(52, 62, 76);
+  private static final Color WEIGHT_TAB_ACTIVE_BORDER = new Color(140, 172, 230);
+  private static final Color WEIGHT_TAB_IDLE_BORDER = new Color(205, 214, 228);
 
   private static final RoundDefinition[] CONSOLATION_ROUNDS = {
     RoundDefinition.CONSOLATION_PIGTAIL,
@@ -227,8 +238,7 @@ public class Bracket {
     for (JButton tabButton : weightTabButtons) {
       final boolean selected = tabButton.getText().equals(selectedSheetName);
       tabButton.setEnabled(!selected);
-      tabButton.setBackground(selected ? TAB_ACTIVE_COLOR : TAB_IDLE_COLOR);
-      tabButton.setForeground(selected ? TAB_ACTIVE_TEXT_COLOR : TAB_IDLE_TEXT_COLOR);
+      applyWeightTabState(tabButton, selected);
     }
   }
 
@@ -291,7 +301,7 @@ public class Bracket {
 
     final EnumMap<RoundDefinition, List<MatchNode>> rounds = buildChampionshipRounds(championshipRow);
     final EnumMap<RoundDefinition, List<MatchNode>> consolationRounds = buildConsolationRounds(consolationRow);
-    addEmptyRoundColumn(championshipRow);
+    addResetButtonColumn(championshipRow, consolationRow);
     final EnumMap<RoundDefinition, MatchNode> placementMatches = createPlacementStackSection(championshipRow);
     bindPlacementRankingNodes(rounds, consolationRounds, placementMatches);
 
@@ -458,16 +468,15 @@ public class Bracket {
       round.getDisplayName(),
       round.getMatchCount(),
       round.getRoundDepth(),
-      round.isResetButton(),
       round.getBracketSection()
     );
   }
 
   private List<MatchNode> createConsolationRoundSection(JPanel bracketPanel, RoundDefinition round) {
-    boolean isPlacement = round.isPlacementRound();
-    BracketSection section = round.getBracketSection();
-    int roundDepth = isPlacement ? 0 : round.getRoundDepth();
-    return createRoundSection(bracketPanel, round.getDisplayName(), round.getMatchCount(), roundDepth, false, section);
+    final boolean isPlacement = round.isPlacementRound();
+    final BracketSection section = round.getBracketSection();
+    final int roundDepth = isPlacement ? 0 : round.getRoundDepth();
+    return createRoundSection(bracketPanel, round.getDisplayName(), round.getMatchCount(), roundDepth, section);
   }
 
   private EnumMap<RoundDefinition, MatchNode> createPlacementStackSection(JPanel bracketPanel) {
@@ -518,28 +527,15 @@ public class Bracket {
     for (int i = 1; i <= ALL_AMERICAN_COUNT; i++) {
       final JPanel row = new JPanel();
       row.setOpaque(false);
-      row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+      row.setLayout(new BorderLayout());
       row.setAlignmentX(Component.CENTER_ALIGNMENT);
       row.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
-      row.setMaximumSize(new Dimension(Integer.MAX_VALUE, WRESTLER_BUTTON_SIZE.height));
-      row.add(Box.createHorizontalGlue());
+      row.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
 
-      final JLabel node = new JLabel("TBD", SwingConstants.LEFT);
-      node.setOpaque(true);
-      node.setBackground(BUTTON_BASE_COLOR);
-      node.setForeground(BUTTON_TEXT_COLOR);
-      node.setFont(node.getFont().deriveFont(Font.PLAIN, BUTTON_FONT_SIZE));
-      node.setBorder(BorderFactory.createCompoundBorder(
-        new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
-        BorderFactory.createEmptyBorder(2, 6, 2, 6)
-      ));
-      node.setPreferredSize(WRESTLER_BUTTON_SIZE);
-      node.setMinimumSize(WRESTLER_BUTTON_SIZE);
-      node.setMaximumSize(WRESTLER_BUTTON_SIZE);
+      final JLabel node = getJLabel(i);
 
       allAmericanNodes.add(node);
-      row.add(node);
-      row.add(Box.createHorizontalGlue());
+      row.add(node, BorderLayout.CENTER);
       section.add(row);
       if (i < ALL_AMERICAN_COUNT) {
         section.add(Box.createVerticalStrut(4));
@@ -547,6 +543,26 @@ public class Bracket {
     }
 
     return section;
+  }
+
+  private JLabel getJLabel(int i) {
+    final JLabel node = new JLabel("#" + i + " TBD", SwingConstants.LEFT);
+    node.setOpaque(true);
+    node.setBackground(allAmericanPlacementColor(i));
+    node.setForeground(BUTTON_TEXT_COLOR);
+    node.setFont(node.getFont().deriveFont(Font.PLAIN, BUTTON_FONT_SIZE));
+    node.setBorder(BorderFactory.createCompoundBorder(
+      new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
+      BorderFactory.createEmptyBorder(2, 6, 2, 6)
+    ));
+    final Dimension allAmericanNodeSize = new Dimension(
+      ROUND_COLUMN_WIDTH - (ROUND_INNER_PADDING * 2),
+      WRESTLER_BUTTON_SIZE.height
+    );
+    node.setPreferredSize(allAmericanNodeSize);
+    node.setMinimumSize(allAmericanNodeSize);
+    node.setMaximumSize(allAmericanNodeSize);
+    return node;
   }
 
   private void addEmptyRoundColumn(JPanel row) {
@@ -557,6 +573,22 @@ public class Bracket {
     emptyPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
     row.add(emptyPanel);
     row.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
+  }
+
+  private void addResetButtonColumn(JPanel championshipRow, JPanel consolationRow) {
+    final JPanel resetColumn = new JPanel();
+    resetColumn.setLayout(new BoxLayout(resetColumn, BoxLayout.Y_AXIS));
+    resetColumn.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
+    resetColumn.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
+    resetColumn.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
+    resetColumn.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
+
+    addResetButtonToFinalRound(resetColumn);
+    resetColumn.add(Box.createVerticalGlue());
+
+    championshipRow.add(resetColumn);
+    championshipRow.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
+    addEmptyRoundColumn(consolationRow);
   }
 
   private JPanel createPlacementLabeledNode(String label, MatchNode placementNode) {
@@ -596,7 +628,6 @@ public class Bracket {
     String roundName,
     int matchCount,
     int roundDepth,
-    boolean withResetButton,
     BracketSection bracketSection
   ) {
     final JPanel roundPanel = new JPanel();
@@ -606,11 +637,6 @@ public class Bracket {
     roundPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
 
     addRoundHeader(roundPanel, roundName);
-    if (withResetButton) {
-      addResetButtonToFinalRound(roundPanel);
-      roundPanel.add(Box.createVerticalStrut(ROUND_HEADER_BOTTOM_SPACING));
-    }
-
     final int topOffset = BracketLayout.calculateTopOffset(roundDepth);
     final int betweenGap = BracketLayout.calculateBetweenGap(roundDepth);
     if (topOffset > 0) {
@@ -676,12 +702,18 @@ public class Bracket {
     button.setFocusPainted(false);
     button.setOpaque(true);
     button.setContentAreaFilled(true);
+    button.setFont(button.getFont().deriveFont(Font.BOLD, 12f));
+    applyWeightTabState(button, false);
+  }
+
+  private void applyWeightTabState(JButton button, boolean selected) {
+    final Color borderColor = selected ? WEIGHT_TAB_ACTIVE_BORDER : WEIGHT_TAB_IDLE_BORDER;
     button.setBorder(BorderFactory.createCompoundBorder(
-      new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
-      BorderFactory.createEmptyBorder(4, 12, 4, 12)
+      new LineBorder(borderColor, 1, true),
+      BorderFactory.createEmptyBorder(6, 14, 6, 14)
     ));
-    button.setBackground(TAB_IDLE_COLOR);
-    button.setForeground(TAB_IDLE_TEXT_COLOR);
+    button.setBackground(selected ? WEIGHT_TAB_ACTIVE_BG : WEIGHT_TAB_IDLE_BG);
+    button.setForeground(selected ? WEIGHT_TAB_ACTIVE_TEXT : WEIGHT_TAB_IDLE_TEXT);
   }
 
   private void styleActionButton(JButton button) {
@@ -824,8 +856,31 @@ public class Bracket {
 
     for (int i = 0; i < allAmericanNodes.size() && i < placements.length; i++) {
       final JLabel node = allAmericanNodes.get(i);
-      node.setText(WrestlerLabelFormatter.format(placements[i]));
+      node.setText(formatAllAmericanLabel(i + 1, placements[i]));
     }
+  }
+
+  private Color allAmericanPlacementColor(int placement) {
+    if (placement == 1) {
+      return ALL_AMERICAN_FIRST_COLOR;
+    }
+    if (placement == 2) {
+      return ALL_AMERICAN_SECOND_COLOR;
+    }
+    if (placement == 3) {
+      return ALL_AMERICAN_THIRD_COLOR;
+    }
+    return ALL_AMERICAN_OTHER_COLOR;
+  }
+
+  private String formatAllAmericanLabel(int placement, Wrestler wrestler) {
+    final String prefix = "#" + placement + " ";
+    if (wrestler == null) {
+      return prefix + "TBD";
+    }
+    final String seedSuffix = wrestler.getSeed() > 0 ? " (" + wrestler.getSeed() + ")" : "";
+    return prefix + wrestler.getName() + " (" + wrestler.getTeam() + ") "
+      + wrestler.getWins() + "-" + wrestler.getLosses() + seedSuffix;
   }
 
   private Wrestler selectedWinner(MatchNode node) {
