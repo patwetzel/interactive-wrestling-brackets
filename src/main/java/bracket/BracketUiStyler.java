@@ -4,9 +4,7 @@ import lombok.experimental.UtilityClass;
 import match.MatchNode;
 
 import javax.swing.JButton;
-import java.awt.Color;
 
-import static constants.Constants.BUTTON_BASE_COLOR;
 import static constants.Constants.LOSER_COLOR;
 import static constants.Constants.WINNER_COLOR;
 
@@ -26,12 +24,12 @@ public class BracketUiStyler {
   }
 
   public static void resetButtonColors(MatchNode node) {
-    applyBaseButtonStyle(node.getButtonOne(), BUTTON_BASE_COLOR);
-    applyBaseButtonStyle(node.getButtonTwo(), BUTTON_BASE_COLOR);
+    applyBaseButtonStyle(node.getButtonOne());
+    applyBaseButtonStyle(node.getButtonTwo());
   }
 
-  private static void applyBaseButtonStyle(JButton button, Color background) {
-    button.setBackground(background);
+  private static void applyBaseButtonStyle(JButton button) {
+    button.setBackground(constants.Constants.BUTTON_BASE_COLOR);
     button.setOpaque(true);
     button.setContentAreaFilled(true);
   }

@@ -36,9 +36,7 @@ public class Constants {
   public static final Color SURFACE_COLOR = new Color(255, 255, 255);
   public static final Color BUTTON_BASE_COLOR = new Color(246, 248, 251);
   public static final Color BUTTON_TEXT_COLOR = new Color(34, 40, 49);
-  public static final Color TAB_ACTIVE_COLOR = new Color(47, 111, 237);
   public static final Color TAB_IDLE_COLOR = new Color(232, 238, 249);
-  public static final Color TAB_ACTIVE_TEXT_COLOR = new Color(255, 255, 255);
   public static final Color TAB_IDLE_TEXT_COLOR = new Color(43, 58, 79);
   public static final Color SUBTLE_BORDER_COLOR = new Color(207, 216, 230);
   public static final Color CONNECTOR_COLOR = new Color(120, 120, 120);

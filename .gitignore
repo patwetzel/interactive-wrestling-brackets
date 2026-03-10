@@ -9,6 +9,7 @@ out/
 **/target/
 **/out/
 *.class
+dist/
 
 # OS noise
 .DS_Store

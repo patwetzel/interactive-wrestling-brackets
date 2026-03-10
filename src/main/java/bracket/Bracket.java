@@ -690,7 +690,7 @@ public class Bracket {
   }
 
   private void addResetButtonToFinalRound(JPanel roundPanel) {
-    final JButton openButton = new JButton("Open");
+    final JButton openButton = new JButton("Open Brackets");
     styleActionButton(openButton);
     openButton.addActionListener(e -> openStateFromDisk());
     final JPanel openRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
@@ -701,7 +701,7 @@ public class Bracket {
     roundPanel.add(openRow);
     roundPanel.add(Box.createVerticalStrut(6));
 
-    final JButton saveButton = new JButton("Save");
+    final JButton saveButton = new JButton("Save Brackets");
     styleActionButton(saveButton);
     saveButton.addActionListener(e -> saveStateToDisk());
     final JPanel saveRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
