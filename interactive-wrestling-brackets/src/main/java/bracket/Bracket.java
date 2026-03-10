@@ -31,13 +31,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class Bracket {
 
@@ -52,6 +46,8 @@ public class Bracket {
   private static final Color WEIGHT_TAB_IDLE_TEXT = new Color(52, 62, 76);
   private static final Color WEIGHT_TAB_ACTIVE_BORDER = new Color(140, 172, 230);
   private static final Color WEIGHT_TAB_IDLE_BORDER = new Color(205, 214, 228);
+  private static final String ALL_AMERICANS_TAB_LABEL = "All-Americans";
+  private static final int MAX_WEIGHT_TABS = 10;
 
   private static final RoundDefinition[] CONSOLATION_ROUNDS = {
     RoundDefinition.CONSOLATION_PIGTAIL,
@@ -93,9 +89,14 @@ public class Bracket {
   private final SeededWrestlerImporter seededWrestlerImporter = new SeededWrestlerImporter();
   private final List<JButton> weightTabButtons = new ArrayList<>();
   private final Map<String, List<Integer>> weightProgressBySheet = new HashMap<>();
+  private final Map<String, List<Wrestler>> allAmericanBySheet = new HashMap<>();
+  private final Map<String, List<JLabel>> allAmericanOverviewNodesBySheet = new HashMap<>();
+  private final List<String> weightSheetNames = new ArrayList<>();
 
   private Path seedingFilePath;
   private String selectedSheetName;
+  private boolean showingAllAmericans;
+  private JButton allAmericansTabButton;
 
   private BracketBoardPanel bracketBoard;
   private MatchNode finalMatchNode;
@@ -183,8 +184,9 @@ public class Bracket {
   private void buildWeightTabs(List<String> sheetNames) {
     weightTabsPanel.removeAll();
     weightTabButtons.clear();
+    weightSheetNames.clear();
 
-    final int maxTabs = Math.min(10, sheetNames.size());
+    final int maxTabs = Math.min(MAX_WEIGHT_TABS, sheetNames.size());
     for (int i = 0; i < maxTabs; i++) {
       final String sheetName = sheetNames.get(i);
       final JButton tabButton = new JButton(sheetName);
@@ -192,7 +194,13 @@ public class Bracket {
       styleWeightTabButton(tabButton);
       weightTabsPanel.add(tabButton);
       weightTabButtons.add(tabButton);
+      weightSheetNames.add(sheetName);
     }
+
+    allAmericansTabButton = new JButton(ALL_AMERICANS_TAB_LABEL);
+    allAmericansTabButton.addActionListener(e -> showAllAmericansPage());
+    styleWeightTabButton(allAmericansTabButton);
+    weightTabsPanel.add(allAmericansTabButton);
 
     weightTabsPanel.revalidate();
     weightTabsPanel.repaint();
@@ -203,6 +211,7 @@ public class Bracket {
       return;
     }
 
+    showingAllAmericans = false;
     if (selectedSheetName != null && !selectedSheetName.equals(sheetName)) {
       saveCurrentWeightProgress(selectedSheetName);
     }
@@ -239,6 +248,10 @@ public class Bracket {
       final boolean selected = tabButton.getText().equals(selectedSheetName);
       tabButton.setEnabled(!selected);
       applyWeightTabState(tabButton, selected);
+    }
+    if (allAmericansTabButton != null) {
+      allAmericansTabButton.setEnabled(!showingAllAmericans);
+      applyWeightTabState(allAmericansTabButton, showingAllAmericans);
     }
   }
 
@@ -301,7 +314,7 @@ public class Bracket {
 
     final EnumMap<RoundDefinition, List<MatchNode>> rounds = buildChampionshipRounds(championshipRow);
     final EnumMap<RoundDefinition, List<MatchNode>> consolationRounds = buildConsolationRounds(consolationRow);
-    addResetButtonColumn(championshipRow, consolationRow);
+    addResetButtonColumn(championshipRow);
     final EnumMap<RoundDefinition, MatchNode> placementMatches = createPlacementStackSection(championshipRow);
     bindPlacementRankingNodes(rounds, consolationRounds, placementMatches);
 
@@ -498,7 +511,6 @@ public class Bracket {
     placementPanel.add(createPlacementLabeledNode(RoundDefinition.SEVENTH_PLACE.getDisplayName(), seventhPlace));
 
     bracketPanel.add(placementPanel);
-    bracketPanel.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
 
     EnumMap<RoundDefinition, MatchNode> placementMatches = new EnumMap<>(RoundDefinition.class);
     placementMatches.put(RoundDefinition.FIFTH_PLACE, fifthPlace);
@@ -546,17 +558,20 @@ public class Bracket {
   }
 
   private JLabel getJLabel(int i) {
-    final JLabel node = new JLabel("#" + i + " TBD", SwingConstants.LEFT);
+    final JLabel node = new JLabel("#" + i + " TBD", SwingConstants.CENTER);
+    node.setAlignmentX(Component.CENTER_ALIGNMENT);
+    node.setHorizontalAlignment(SwingConstants.CENTER);
+    node.setHorizontalTextPosition(SwingConstants.CENTER);
     node.setOpaque(true);
     node.setBackground(allAmericanPlacementColor(i));
     node.setForeground(BUTTON_TEXT_COLOR);
     node.setFont(node.getFont().deriveFont(Font.PLAIN, BUTTON_FONT_SIZE));
     node.setBorder(BorderFactory.createCompoundBorder(
       new LineBorder(SUBTLE_BORDER_COLOR, 1, true),
-      BorderFactory.createEmptyBorder(2, 6, 2, 6)
+      BorderFactory.createEmptyBorder(2, 4, 2, 4)
     ));
     final Dimension allAmericanNodeSize = new Dimension(
-      ROUND_COLUMN_WIDTH - (ROUND_INNER_PADDING * 2),
+      ROUND_COLUMN_WIDTH,
       WRESTLER_BUTTON_SIZE.height
     );
     node.setPreferredSize(allAmericanNodeSize);
@@ -565,17 +580,7 @@ public class Bracket {
     return node;
   }
 
-  private void addEmptyRoundColumn(JPanel row) {
-    final JPanel emptyPanel = new JPanel();
-    emptyPanel.setOpaque(false);
-    emptyPanel.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
-    emptyPanel.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
-    emptyPanel.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
-    row.add(emptyPanel);
-    row.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
-  }
-
-  private void addResetButtonColumn(JPanel championshipRow, JPanel consolationRow) {
+  private void addResetButtonColumn(JPanel championshipRow) {
     final JPanel resetColumn = new JPanel();
     resetColumn.setLayout(new BoxLayout(resetColumn, BoxLayout.Y_AXIS));
     resetColumn.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
@@ -588,7 +593,6 @@ public class Bracket {
 
     championshipRow.add(resetColumn);
     championshipRow.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
-    addEmptyRoundColumn(consolationRow);
   }
 
   private JPanel createPlacementLabeledNode(String label, MatchNode placementNode) {
@@ -858,6 +862,8 @@ public class Bracket {
       final JLabel node = allAmericanNodes.get(i);
       node.setText(formatAllAmericanLabel(i + 1, placements[i]));
     }
+
+    storeAllAmericansForCurrentSheet(placements);
   }
 
   private Color allAmericanPlacementColor(int placement) {
@@ -894,6 +900,137 @@ public class Bracket {
   private void repaintBracketBoard() {
     if (bracketBoard != null) {
       bracketBoard.repaint();
+    }
+  }
+
+  private void showAllAmericansPage() {
+    if (seedingFilePath == null) {
+      return;
+    }
+    if (selectedSheetName != null) {
+      saveCurrentWeightProgress(selectedSheetName);
+    }
+    selectedSheetName = null;
+    showingAllAmericans = true;
+    updateWeightTabState();
+    renderAllAmericansOverview();
+  }
+
+  private void storeAllAmericansForCurrentSheet(Wrestler[] placements) {
+    if (selectedSheetName == null) {
+      return;
+    }
+    final List<Wrestler> snapshot = new ArrayList<>(Arrays.asList(placements));
+    allAmericanBySheet.put(selectedSheetName, snapshot);
+  }
+
+  private void renderAllAmericansOverview() {
+    resetBracketPanel();
+
+    final JPanel container = new JPanel();
+    container.setOpaque(false);
+    container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
+    container.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_PANEL_GAP, ROUND_OUTER_PADDING, ROUND_PANEL_GAP));
+
+    final JLabel header = new JLabel(ALL_AMERICANS_TAB_LABEL, SwingConstants.CENTER);
+    header.setFont(header.getFont().deriveFont(Font.BOLD, ROUND_HEADER_FONT_SIZE + 2));
+    header.setForeground(BUTTON_TEXT_COLOR);
+    final JPanel headerRow = new JPanel(new BorderLayout());
+    headerRow.setOpaque(false);
+    headerRow.setAlignmentX(Component.CENTER_ALIGNMENT);
+    headerRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROUND_HEADER_HEIGHT));
+    headerRow.add(header, BorderLayout.CENTER);
+    container.add(headerRow);
+    container.add(Box.createVerticalStrut(12));
+
+    final JPanel topRow = createAllAmericansRow();
+    final JPanel bottomRow = createAllAmericansRow();
+
+    allAmericanOverviewNodesBySheet.clear();
+    final int splitIndex = Math.min(5, weightSheetNames.size());
+    for (int i = 0; i < weightSheetNames.size(); i++) {
+      final String sheetName = weightSheetNames.get(i);
+      final JPanel column = createAllAmericansWeightColumn(sheetName);
+      if (i < splitIndex) {
+        topRow.add(column);
+        if (i < splitIndex - 1) {
+          topRow.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
+        }
+      } else {
+        bottomRow.add(column);
+        if (i < weightSheetNames.size() - 1) {
+          bottomRow.add(Box.createHorizontalStrut(ROUND_PANEL_GAP));
+        }
+      }
+    }
+
+    container.add(topRow);
+    container.add(Box.createVerticalStrut(18));
+    container.add(bottomRow);
+
+    buttonPanel.add(container, BorderLayout.NORTH);
+    refreshAllAmericansOverview();
+    buttonPanel.revalidate();
+    buttonPanel.repaint();
+  }
+
+  private JPanel createAllAmericansRow() {
+    final JPanel row = new JPanel();
+    row.setOpaque(false);
+    row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+    row.setAlignmentX(Component.CENTER_ALIGNMENT);
+    return row;
+  }
+
+  private JPanel createAllAmericansWeightColumn(String sheetName) {
+    final JPanel column = new JPanel();
+    column.setOpaque(false);
+    column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
+    column.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
+    column.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
+    column.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
+
+    final JLabel title = new JLabel(sheetName, SwingConstants.CENTER);
+    title.setFont(title.getFont().deriveFont(Font.BOLD, ROUND_HEADER_FONT_SIZE));
+    title.setForeground(BUTTON_TEXT_COLOR);
+    final JPanel titleRow = new JPanel(new BorderLayout());
+    titleRow.setOpaque(false);
+    titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+    titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROUND_HEADER_HEIGHT));
+    titleRow.add(title, BorderLayout.CENTER);
+    column.add(titleRow);
+    column.add(Box.createVerticalStrut(6));
+
+    final List<JLabel> nodes = new ArrayList<>();
+    for (int i = 1; i <= ALL_AMERICAN_COUNT; i++) {
+      final JPanel row = new JPanel(new BorderLayout());
+      row.setOpaque(false);
+      row.setAlignmentX(Component.CENTER_ALIGNMENT);
+      row.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
+      row.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
+
+      final JLabel node = getJLabel(i);
+      nodes.add(node);
+      row.add(node, BorderLayout.CENTER);
+      column.add(row);
+      if (i < ALL_AMERICAN_COUNT) {
+        column.add(Box.createVerticalStrut(4));
+      }
+    }
+
+    allAmericanOverviewNodesBySheet.put(sheetName, nodes);
+    return column;
+  }
+
+  private void refreshAllAmericansOverview() {
+    for (Map.Entry<String, List<JLabel>> entry : allAmericanOverviewNodesBySheet.entrySet()) {
+      final String sheetName = entry.getKey();
+      final List<JLabel> nodes = entry.getValue();
+      final List<Wrestler> placements = allAmericanBySheet.get(sheetName);
+      for (int i = 0; i < nodes.size(); i++) {
+        final Wrestler wrestler = placements != null && i < placements.size() ? placements.get(i) : null;
+        nodes.get(i).setText(formatAllAmericanLabel(i + 1, wrestler));
+      }
     }
   }
 
