@@ -11,27 +11,26 @@ import wrestler.SeededWrestlerImporter;
 import wrestler.Wrestler;
 import wrestler.WrestlerLabelFormatter;
 
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.border.LineBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.io.*;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public class Bracket {
 
@@ -48,6 +47,11 @@ public class Bracket {
   private static final Color WEIGHT_TAB_IDLE_BORDER = new Color(205, 214, 228);
   private static final String ALL_AMERICANS_TAB_LABEL = "All-Americans";
   private static final int MAX_WEIGHT_TABS = 10;
+  private static final Path SAVE_STATE_PATH = Path.of(
+    System.getProperty("user.home"),
+    ".interactive-wrestling-brackets",
+    "state.bin"
+  );
 
   private static final RoundDefinition[] CONSOLATION_ROUNDS = {
     RoundDefinition.CONSOLATION_PIGTAIL,
@@ -89,7 +93,7 @@ public class Bracket {
   private final SeededWrestlerImporter seededWrestlerImporter = new SeededWrestlerImporter();
   private final List<JButton> weightTabButtons = new ArrayList<>();
   private final Map<String, List<Integer>> weightProgressBySheet = new HashMap<>();
-  private final Map<String, List<Wrestler>> allAmericanBySheet = new HashMap<>();
+  private final Map<String, List<String>> allAmericanLabelsBySheet = new HashMap<>();
   private final Map<String, List<JLabel>> allAmericanOverviewNodesBySheet = new HashMap<>();
   private final List<String> weightSheetNames = new ArrayList<>();
 
@@ -97,6 +101,7 @@ public class Bracket {
   private String selectedSheetName;
   private boolean showingAllAmericans;
   private JButton allAmericansTabButton;
+  private Path lastSavePath = SAVE_STATE_PATH;
 
   private BracketBoardPanel bracketBoard;
   private MatchNode finalMatchNode;
@@ -170,7 +175,9 @@ public class Bracket {
       if (sheetNames.isEmpty()) {
         throw new IllegalStateException("No sheets found in seeding workbook.");
       }
-      loadWeightSheet(sheetNames.get(0));
+      if (!loadSavedStateIfPresent(sheetNames)) {
+        loadWeightSheet(sheetNames.get(0));
+      }
     } catch (Exception e) {
       JOptionPane.showMessageDialog(
         frame,
@@ -683,6 +690,28 @@ public class Bracket {
   }
 
   private void addResetButtonToFinalRound(JPanel roundPanel) {
+    final JButton openButton = new JButton("Open");
+    styleActionButton(openButton);
+    openButton.addActionListener(e -> openStateFromDisk());
+    final JPanel openRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+    openRow.setOpaque(false);
+    openRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+    openRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, openButton.getPreferredSize().height));
+    openRow.add(openButton);
+    roundPanel.add(openRow);
+    roundPanel.add(Box.createVerticalStrut(6));
+
+    final JButton saveButton = new JButton("Save");
+    styleActionButton(saveButton);
+    saveButton.addActionListener(e -> saveStateToDisk());
+    final JPanel saveRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+    saveRow.setOpaque(false);
+    saveRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+    saveRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, saveButton.getPreferredSize().height));
+    saveRow.add(saveButton);
+    roundPanel.add(saveRow);
+    roundPanel.add(Box.createVerticalStrut(6));
+
     final JButton resetButton = new JButton("Reset Bracket");
     styleActionButton(resetButton);
     resetButton.addActionListener(e -> {
@@ -690,6 +719,7 @@ public class Bracket {
         if (selectedSheetName != null) {
           weightProgressBySheet.remove(selectedSheetName);
         }
+        allAmericanLabelsBySheet.remove(selectedSheetName);
         renderSeededBracket(initialSeededWrestlers);
       }
     });
@@ -920,8 +950,12 @@ public class Bracket {
     if (selectedSheetName == null) {
       return;
     }
-    final List<Wrestler> snapshot = new ArrayList<>(Arrays.asList(placements));
-    allAmericanBySheet.put(selectedSheetName, snapshot);
+
+    final List<String> snapshot = new ArrayList<>();
+    for (int i = 0; i < placements.length; i++) {
+      snapshot.add(formatAllAmericanLabel(i + 1, placements[i]));
+    }
+    allAmericanLabelsBySheet.put(selectedSheetName, snapshot);
   }
 
   private void renderAllAmericansOverview() {
@@ -1026,12 +1060,193 @@ public class Bracket {
     for (Map.Entry<String, List<JLabel>> entry : allAmericanOverviewNodesBySheet.entrySet()) {
       final String sheetName = entry.getKey();
       final List<JLabel> nodes = entry.getValue();
-      final List<Wrestler> placements = allAmericanBySheet.get(sheetName);
+      final List<String> placements = allAmericanLabelsBySheet.get(sheetName);
+
       for (int i = 0; i < nodes.size(); i++) {
-        final Wrestler wrestler = placements != null && i < placements.size() ? placements.get(i) : null;
-        nodes.get(i).setText(formatAllAmericanLabel(i + 1, wrestler));
+        final String label = placements != null && i < placements.size()
+          ? placements.get(i)
+          : formatAllAmericanLabel(i + 1, null);
+        nodes.get(i).setText(label);
       }
     }
+  }
+
+  private boolean loadSavedStateIfPresent(List<String> sheetNames) {
+    if (!Files.exists(SAVE_STATE_PATH)) {
+      return false;
+    }
+
+    try {
+      return loadStateFromPath(SAVE_STATE_PATH, sheetNames, false);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void saveStateToDisk() {
+    if (seedingFilePath == null) {
+      return;
+    }
+
+    final Optional<Path> targetPath = chooseStateFile("Save Bracket State", true);
+    if (targetPath.isEmpty()) {
+      return;
+    }
+
+    lastSavePath = targetPath.get();
+    saveStateToPath(targetPath.get());
+  }
+
+  private void openStateFromDisk() {
+    final Optional<Path> targetPath = chooseStateFile("Open Bracket State", false);
+    if (targetPath.isEmpty()) {
+      return;
+    }
+    lastSavePath = targetPath.get();
+
+    try {
+      loadStateFromPath(targetPath.get(), weightSheetNames, true);
+    } catch (Exception e) {
+      JOptionPane.showMessageDialog(
+        frame,
+        "Failed to load saved state: " + e.getMessage(),
+        "Saved State Error",
+        JOptionPane.ERROR_MESSAGE
+      );
+    }
+  }
+
+  private Optional<Path> chooseStateFile(String title, boolean isSaveDialog) {
+    final JFileChooser chooser = new JFileChooser();
+    chooser.setDialogTitle(title);
+
+    final Path initialDir = lastSavePath != null ? lastSavePath.getParent() : SAVE_STATE_PATH.getParent();
+    if (initialDir != null) {
+      chooser.setCurrentDirectory(initialDir.toFile());
+    }
+    chooser.setFileFilter(new FileNameExtensionFilter("Bracket State (*.bin)", "bin"));
+
+    if (isSaveDialog) {
+      if (lastSavePath != null) {
+        chooser.setSelectedFile(lastSavePath.toFile());
+      }
+      final int result = chooser.showSaveDialog(frame);
+      if (result != JFileChooser.APPROVE_OPTION) {
+        return Optional.empty();
+      }
+      return normalizeSavePath(chooser.getSelectedFile().toPath());
+    }
+
+    final int result = chooser.showOpenDialog(frame);
+    if (result != JFileChooser.APPROVE_OPTION) {
+      return Optional.empty();
+    }
+
+    return Optional.ofNullable(chooser.getSelectedFile()).map(File::toPath);
+  }
+
+  private Optional<Path> normalizeSavePath(Path selected) {
+    if (selected == null) {
+      return Optional.empty();
+    }
+
+    try {
+      final String name = selected.getFileName().toString();
+      if (!name.toLowerCase().endsWith(".bin")) {
+        return Optional.of(selected.resolveSibling(name + ".bin"));
+      }
+      return Optional.of(selected);
+    } catch (InvalidPathException e) {
+      return Optional.empty();
+    }
+  }
+
+  private void saveStateToPath(Path targetPath) {
+    if (selectedSheetName != null) {
+      saveCurrentWeightProgress(selectedSheetName);
+    }
+
+    try {
+      final Path parent = targetPath.getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
+      final SaveState state = new SaveState(
+        selectedSheetName,
+        copyWeightProgress(weightProgressBySheet),
+        copyAllAmericanLabels(allAmericanLabelsBySheet)
+      );
+      try (ObjectOutputStream output = new ObjectOutputStream(Files.newOutputStream(targetPath))) {
+        output.writeObject(state);
+      }
+      JOptionPane.showMessageDialog(frame, "Bracket saved.", "Saved", JOptionPane.INFORMATION_MESSAGE);
+    } catch (IOException e) {
+      JOptionPane.showMessageDialog(
+        frame,
+        "Failed to save state: " + e.getMessage(),
+        "Save Error",
+        JOptionPane.ERROR_MESSAGE
+      );
+    }
+  }
+
+  private boolean loadStateFromPath(Path sourcePath, List<String> sheetNames, boolean notify) throws IOException, ClassNotFoundException {
+    if (!Files.exists(sourcePath)) {
+      return false;
+    }
+
+    try (ObjectInputStream input = new SaveStateObjectInputStream(sourcePath)) {
+      final SaveState state = (SaveState) input.readObject();
+      weightProgressBySheet.clear();
+      weightProgressBySheet.putAll(copyWeightProgress(state.weightProgressBySheet));
+      allAmericanLabelsBySheet.clear();
+      allAmericanLabelsBySheet.putAll(copyAllAmericanLabels(state.allAmericanLabelsBySheet));
+      String initialSheet = state.selectedSheetName;
+      if (initialSheet == null || !sheetNames.contains(initialSheet)) {
+        initialSheet = sheetNames.isEmpty() ? null : sheetNames.get(0);
+      }
+      if (initialSheet != null) {
+        loadWeightSheet(initialSheet);
+      }
+      if (notify) {
+        JOptionPane.showMessageDialog(frame, "Bracket loaded.", "Loaded", JOptionPane.INFORMATION_MESSAGE);
+      }
+      return true;
+    }
+  }
+
+  private static final class SaveStateObjectInputStream extends ObjectInputStream {
+    private static final String LEGACY_CLASS_NAME = "bracket.Bracket$SaveState";
+
+    private SaveStateObjectInputStream(Path sourcePath) throws IOException {
+      super(Files.newInputStream(sourcePath));
+    }
+
+    @Override
+    protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+      if (LEGACY_CLASS_NAME.equals(desc.getName())) {
+        return SaveState.class;
+      }
+      return super.resolveClass(desc);
+    }
+  }
+
+  private Map<String, List<Integer>> copyWeightProgress(Map<String, List<Integer>> source) {
+    final Map<String, List<Integer>> copy = new HashMap<>();
+    for (Map.Entry<String, List<Integer>> entry : source.entrySet()) {
+      copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    }
+
+    return copy;
+  }
+
+  private Map<String, List<String>> copyAllAmericanLabels(Map<String, List<String>> source) {
+    final Map<String, List<String>> copy = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : source.entrySet()) {
+      copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    }
+
+    return copy;
   }
 
   public static void main(String[] args) {
