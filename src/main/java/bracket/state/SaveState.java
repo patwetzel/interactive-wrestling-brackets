@@ -1,19 +1,19 @@
-package bracket;
+package bracket.state;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
-final class SaveState implements Serializable {
+public final class SaveState implements Serializable {
   @Serial
   private static final long serialVersionUID = 1L;
 
-  final String selectedSheetName;
-  final Map<String, List<Integer>> weightProgressBySheet;
-  final Map<String, List<String>> allAmericanLabelsBySheet;
+  public final String selectedSheetName;
+  public final Map<String, List<Integer>> weightProgressBySheet;
+  public final Map<String, List<String>> allAmericanLabelsBySheet;
 
-  SaveState(
+  public SaveState(
     String selectedSheetName,
     Map<String, List<Integer>> weightProgressBySheet,
     Map<String, List<String>> allAmericanLabelsBySheet
