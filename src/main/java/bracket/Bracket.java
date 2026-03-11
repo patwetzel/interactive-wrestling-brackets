@@ -1020,6 +1020,7 @@ public class Bracket {
     final JPanel column = new JPanel();
     column.setOpaque(false);
     column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
+    column.setAlignmentX(Component.CENTER_ALIGNMENT);
     column.setBorder(BorderFactory.createEmptyBorder(ROUND_OUTER_PADDING, ROUND_INNER_PADDING, ROUND_OUTER_PADDING, ROUND_INNER_PADDING));
     column.setMinimumSize(new Dimension(ROUND_COLUMN_WIDTH, 0));
     column.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, Integer.MAX_VALUE));
@@ -1029,8 +1030,11 @@ public class Bracket {
     title.setForeground(BUTTON_TEXT_COLOR);
     final JPanel titleRow = new JPanel(new BorderLayout());
     titleRow.setOpaque(false);
-    titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-    titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROUND_HEADER_HEIGHT));
+    titleRow.setAlignmentX(Component.CENTER_ALIGNMENT);
+    final Dimension titleSize = new Dimension(ROUND_COLUMN_WIDTH, ROUND_HEADER_HEIGHT);
+    titleRow.setMinimumSize(titleSize);
+    titleRow.setPreferredSize(titleSize);
+    titleRow.setMaximumSize(titleSize);
     titleRow.add(title, BorderLayout.CENTER);
     column.add(titleRow);
     column.add(Box.createVerticalStrut(6));
