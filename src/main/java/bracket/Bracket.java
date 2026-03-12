@@ -17,8 +17,14 @@ import wrestler.Wrestler;
 import wrestler.WrestlerLabelFormatter;
 
 import javax.swing.*;
+import java.awt.AWTEvent;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
+import java.awt.event.MouseEvent;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -37,6 +43,7 @@ public class Bracket {
   private static final Color ALL_AMERICAN_OTHER_COLOR = new Color(220, 236, 255);
   private static final String ALL_AMERICANS_TAB_LABEL = "All-Americans";
   private static final int MAX_WEIGHT_TABS = 10;
+  private static final double DRAG_SCROLL_SPEED = 1.35;
 
   private final JFrame frame = new JFrame(WINDOW_TITLE);
   private final JPanel buttonPanel = new JPanel();
@@ -76,6 +83,10 @@ public class Bracket {
   private MatchNode fifthPlaceMatchNode;
   private MatchNode seventhPlaceMatchNode;
   private final List<JLabel> allAmericanNodes = new ArrayList<>();
+  private AWTEventListener dragScrollListener;
+  private Point dragStartScreen;
+  private int dragStartHorizontal;
+  private int dragStartVertical;
 
   public Bracket() {
     setupUI();
@@ -110,9 +121,13 @@ public class Bracket {
     bracketScrollPane.getVerticalScrollBar().setBlockIncrement(SCROLL_BLOCK_INCREMENT);
     bracketScrollPane.getHorizontalScrollBar().setUnitIncrement(SCROLL_UNIT_INCREMENT);
     bracketScrollPane.getHorizontalScrollBar().setBlockIncrement(SCROLL_BLOCK_INCREMENT);
-    bracketScrollPane.setWheelScrollingEnabled(true);
+    bracketScrollPane.setWheelScrollingEnabled(false);
+    bracketScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+    bracketScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
     bracketScrollPane.setBorder(BorderFactory.createEmptyBorder());
     bracketScrollPane.getViewport().setBackground(APP_BACKGROUND_COLOR);
+
+    enableDragScrolling();
 
     mainPanel.add(bracketScrollPane, BorderLayout.CENTER);
     weightTabsPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 8, 4));
@@ -120,6 +135,104 @@ public class Bracket {
     weightTabsPanel.setBackground(APP_BACKGROUND_COLOR);
     mainPanel.add(weightTabsPanel, BorderLayout.SOUTH);
     frame.add(mainPanel, BorderLayout.CENTER);
+  }
+
+  private void enableDragScrolling() {
+    if (dragScrollListener != null) {
+      return;
+    }
+    dragScrollListener = event -> {
+      if (!(event instanceof MouseEvent mouseEvent)) {
+        return;
+      }
+
+      if (!SwingUtilities.isLeftMouseButton(mouseEvent)) {
+        return;
+      }
+
+      if (!isEventInFrame(mouseEvent) || isEventOverScrollbar(mouseEvent) || isEventOverWeightTabs(mouseEvent)) {
+        return;
+      }
+
+      switch (mouseEvent.getID()) {
+        case MouseEvent.MOUSE_PRESSED:
+          startDragScroll(mouseEvent);
+          break;
+        case MouseEvent.MOUSE_DRAGGED:
+          updateDragScroll(mouseEvent);
+          break;
+        case MouseEvent.MOUSE_RELEASED:
+          finishDragScroll();
+          break;
+        default:
+          break;
+      }
+    };
+
+    Toolkit.getDefaultToolkit().addAWTEventListener(
+      dragScrollListener,
+      AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK
+    );
+  }
+
+  private boolean isEventInFrame(MouseEvent event) {
+    Object source = event.getSource();
+    if (!(source instanceof Component component)) {
+      return false;
+    }
+    return SwingUtilities.isDescendingFrom(component, frame);
+  }
+
+  private boolean isEventOverScrollbar(MouseEvent event) {
+    Object source = event.getSource();
+    if (!(source instanceof Component component)) {
+      return false;
+    }
+    return SwingUtilities.getAncestorOfClass(JScrollBar.class, component) != null;
+  }
+
+  private boolean isEventOverWeightTabs(MouseEvent event) {
+    Object source = event.getSource();
+    if (!(source instanceof Component component)) {
+      return false;
+    }
+    return SwingUtilities.isDescendingFrom(component, weightTabsPanel);
+  }
+
+  private void startDragScroll(MouseEvent event) {
+    dragStartScreen = event.getLocationOnScreen();
+    dragStartHorizontal = bracketScrollPane.getHorizontalScrollBar().getValue();
+    dragStartVertical = bracketScrollPane.getVerticalScrollBar().getValue();
+  }
+
+  private void updateDragScroll(MouseEvent event) {
+    if (dragStartScreen == null) {
+      return;
+    }
+
+    Point current = event.getLocationOnScreen();
+    int deltaX = current.x - dragStartScreen.x;
+    int deltaY = current.y - dragStartScreen.y;
+
+    int scaledX = (int) Math.round(deltaX * DRAG_SCROLL_SPEED);
+    int scaledY = (int) Math.round(deltaY * DRAG_SCROLL_SPEED);
+    setScrollBarValue(bracketScrollPane.getHorizontalScrollBar(), dragStartHorizontal - scaledX);
+    setScrollBarValue(bracketScrollPane.getVerticalScrollBar(), dragStartVertical - scaledY);
+  }
+
+  private void finishDragScroll() {
+    if (dragStartScreen == null) {
+      return;
+    }
+
+    dragStartScreen = null;
+  }
+
+  private void setScrollBarValue(JScrollBar scrollBar, int value) {
+    int min = scrollBar.getMinimum();
+    int max = scrollBar.getMaximum() - scrollBar.getVisibleAmount();
+    int clamped = Math.max(min, Math.min(max, value));
+    scrollBar.setValue(clamped);
   }
 
   private void loadInitialSeedingIfPresent() {

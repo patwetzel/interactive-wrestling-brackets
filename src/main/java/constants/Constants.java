@@ -42,10 +42,10 @@ public class Constants {
   public static final Color CONNECTOR_COLOR = new Color(120, 120, 120);
   public static final Color WINNER_COLOR = new Color(198, 239, 206);
   public static final Color LOSER_COLOR = new Color(255, 199, 206);
-  public static final Path DEFAULT_SEEDING_FILE = Path.of("src", "test", "java", "SeedingTest.xlsx");
+  public static final Path DEFAULT_SEEDING_FILE = Path.of("src", "test", "java", "Seeding.xlsx");
   public static final List<Path> SEEDING_FILE_CANDIDATES = List.of(
-    Path.of("src", "test", "java", "SeedingTest.xlsx"),
-    Path.of("interactive-wrestling-brackets", "src", "test", "java", "SeedingTest.xlsx")
+    Path.of("src", "test", "java", "Seeding.xlsx"),
+    Path.of("interactive-wrestling-brackets", "src", "test", "java", "Seeding.xlsx")
   );
   public static final String SHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 }
