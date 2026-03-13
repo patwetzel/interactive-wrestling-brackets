@@ -75,6 +75,7 @@ public class Bracket {
 
   private Path seedingFilePath;
   private String selectedSheetName;
+  private String lastWeightSheetName;
   private boolean showingAllAmericans;
 
   private BracketBoardPanel bracketBoard;
@@ -87,6 +88,7 @@ public class Bracket {
   private Point dragStartScreen;
   private int dragStartHorizontal;
   private int dragStartVertical;
+  private boolean suppressProgressPersistence;
 
   public Bracket() {
     setupUI();
@@ -100,11 +102,11 @@ public class Bracket {
   }
 
   private void setupFrame() {
-    frame.setSize(WINDOW_SIZE);
     frame.setLayout(new BorderLayout());
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     frame.setLocationRelativeTo(null);
     frame.getContentPane().setBackground(APP_BACKGROUND_COLOR);
+    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
   }
 
   private void setupPanels() {
@@ -302,6 +304,7 @@ public class Bracket {
 
       initializeSeededWrestlers(seededWrestlers);
       selectedSheetName = sheetName;
+      lastWeightSheetName = sheetName;
       updateWeightTabState();
       renderSeededBracket(seededWrestlers);
       restoreWeightProgress(sheetName);
@@ -343,13 +346,36 @@ public class Bracket {
       return;
     }
 
-    int limit = Math.min(winningSlots.size(), bracketNodes.size());
-    for (int i = 0; i < limit; i++) {
-      int winningSlot = winningSlots.get(i);
-      if (winningSlot == 1 || winningSlot == 2) {
-        advanceWinner(bracketNodes.get(i), winningSlot);
-      }
+    suppressProgressPersistence = true;
+    try {
+      int limit = Math.min(winningSlots.size(), bracketNodes.size());
+      boolean progressed;
+      do {
+        progressed = false;
+        for (int i = 0; i < limit; i++) {
+          int winningSlot = winningSlots.get(i);
+          if (winningSlot != 1 && winningSlot != 2) {
+            continue;
+          }
+
+          MatchNode node = bracketNodes.get(i);
+          if (node.isCompleted()) {
+            continue;
+          }
+
+          if (node.getMatch().getWrestlerOne() == null || node.getMatch().getWrestlerTwo() == null) {
+            continue;
+          }
+
+          advanceWinner(node, winningSlot);
+          progressed = true;
+        }
+      } while (progressed);
+    } finally {
+      suppressProgressPersistence = false;
     }
+
+    saveCurrentWeightProgress(sheetName);
   }
 
   private void renderSeededBracket(List<Wrestler> seededWrestlers) {
@@ -420,6 +446,7 @@ public class Bracket {
 
     refreshAllAmericanNodes();
     repaintBracketBoard();
+    persistCurrentWeightProgress();
   }
 
   private void resetDecisionsFrom(MatchNode node) {
@@ -614,13 +641,15 @@ public class Bracket {
     if (seedingFilePath == null) {
       return;
     }
+    final String saveSheetName = selectedSheetName != null ? selectedSheetName : lastWeightSheetName;
     stateStore.saveStateToDisk(
-      selectedSheetName,
+      saveSheetName,
       weightProgressBySheet,
       allAmericanLabelsBySheet,
       () -> {
-        if (selectedSheetName != null) {
-          saveCurrentWeightProgress(selectedSheetName);
+        final String currentSheet = selectedSheetName != null ? selectedSheetName : lastWeightSheetName;
+        if (currentSheet != null) {
+          saveCurrentWeightProgress(currentSheet);
         }
       }
     );
@@ -642,6 +671,16 @@ public class Bracket {
       }
       allAmericanLabelsBySheet.remove(selectedSheetName);
       renderSeededBracket(initialSeededWrestlers);
+      persistCurrentWeightProgress();
+    }
+  }
+
+  private void persistCurrentWeightProgress() {
+    if (suppressProgressPersistence) {
+      return;
+    }
+    if (selectedSheetName != null) {
+      saveCurrentWeightProgress(selectedSheetName);
     }
   }
 

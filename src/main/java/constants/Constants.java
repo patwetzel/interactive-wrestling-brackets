@@ -2,17 +2,15 @@ package constants;
 
 import lombok.experimental.UtilityClass;
 
-import java.awt.Color;
-import java.awt.Dimension;
+import java.awt.*;
 import java.nio.file.Path;
 import java.util.List;
 
 @UtilityClass
 public class Constants {
 
-  public static final String WINDOW_TITLE = "Wrestling Bracket";
+  public static final String WINDOW_TITLE = "2026 NCAA D1 Championships";
   public static final int EXPECTED_WRESTLER_COUNT = 33;
-  public static final Dimension WINDOW_SIZE = new Dimension(1850, 1000);
   public static final Dimension WRESTLER_BUTTON_SIZE = new Dimension(264, 24);
   public static final int MATCH_CARD_WIDTH = 278;
   public static final int MATCH_CARD_HEIGHT = 63;
