@@ -8,6 +8,7 @@ import bracket.logic.BracketConnectorService;
 import bracket.state.BracketStateStore;
 import bracket.ui.AllAmericansPanelBuilder;
 import bracket.ui.BracketLayoutBuilder;
+import bracket.ui.TeamScoresPanelBuilder;
 import bracket.ui.WeightTabsController;
 import match.Match;
 import match.MatchCardFactory;
@@ -42,8 +43,11 @@ public class Bracket {
   private static final Color ALL_AMERICAN_THIRD_COLOR = new Color(242, 214, 191);
   private static final Color ALL_AMERICAN_OTHER_COLOR = new Color(220, 236, 255);
   private static final String ALL_AMERICANS_TAB_LABEL = "All-Americans";
+  private static final String TEAM_SCORES_TAB_LABEL = "Team Scores";
   private static final int MAX_WEIGHT_TABS = 10;
   private static final double DRAG_SCROLL_SPEED = 1.35;
+  private static final double CHAMPIONSHIP_WIN_POINTS = 1.0;
+  private static final double CONSOLATION_WIN_POINTS = 0.5;
 
   private final JFrame frame = new JFrame(WINDOW_TITLE);
   private final JPanel buttonPanel = new JPanel();
@@ -64,6 +68,7 @@ public class Bracket {
     ALL_AMERICAN_OTHER_COLOR,
     ALL_AMERICANS_TAB_LABEL
   );
+  private final TeamScoresPanelBuilder teamScoresPanelBuilder = new TeamScoresPanelBuilder(TEAM_SCORES_TAB_LABEL);
   private final BracketStateStore stateStore = new BracketStateStore(frame, BracketStateStore.DEFAULT_SAVE_STATE_PATH);
   private final BracketLayoutBuilder layoutBuilder = new BracketLayoutBuilder(
     this::createMatchNode,
@@ -77,6 +82,7 @@ public class Bracket {
   private String selectedSheetName;
   private String lastWeightSheetName;
   private boolean showingAllAmericans;
+  private boolean showingTeamScores;
 
   private BracketBoardPanel bracketBoard;
   private MatchNode finalMatchNode;
@@ -275,8 +281,10 @@ public class Bracket {
       sheetNames,
       MAX_WEIGHT_TABS,
       ALL_AMERICANS_TAB_LABEL,
+      TEAM_SCORES_TAB_LABEL,
       this::loadWeightSheet,
-      this::showAllAmericansPage
+      this::showAllAmericansPage,
+      this::showTeamScoresPage
     );
   }
 
@@ -286,6 +294,7 @@ public class Bracket {
     }
 
     showingAllAmericans = false;
+    showingTeamScores = false;
     if (selectedSheetName != null && !selectedSheetName.equals(sheetName)) {
       saveCurrentWeightProgress(selectedSheetName);
     }
@@ -319,7 +328,7 @@ public class Bracket {
   }
 
   private void updateWeightTabState() {
-    weightTabsController.updateState(selectedSheetName, showingAllAmericans);
+    weightTabsController.updateState(selectedSheetName, showingAllAmericans, showingTeamScores);
   }
 
   private void initializeSeededWrestlers(List<Wrestler> seededWrestlers) {
@@ -445,6 +454,7 @@ public class Bracket {
     assignWrestlerToTarget(source.getLoserNextMatch(), source.getLoserNextSlot(), loser);
 
     refreshAllAmericanNodes();
+    refreshTeamScoresPanel();
     repaintBracketBoard();
     persistCurrentWeightProgress();
   }
@@ -589,8 +599,23 @@ public class Bracket {
     }
     selectedSheetName = null;
     showingAllAmericans = true;
+    showingTeamScores = false;
     updateWeightTabState();
     renderAllAmericansOverview();
+  }
+
+  private void showTeamScoresPage() {
+    if (seedingFilePath == null) {
+      return;
+    }
+    if (selectedSheetName != null) {
+      saveCurrentWeightProgress(selectedSheetName);
+    }
+    selectedSheetName = null;
+    showingAllAmericans = false;
+    showingTeamScores = true;
+    updateWeightTabState();
+    renderTeamScoresPanel();
   }
 
   private void storeAllAmericansForCurrentSheet(Wrestler[] placements) {
@@ -617,6 +642,197 @@ public class Bracket {
     refreshAllAmericansOverview();
     buttonPanel.revalidate();
     buttonPanel.repaint();
+  }
+
+  private void renderTeamScoresPanel() {
+    resetBracketPanel();
+
+    final Map<String, Double> teamScores = calculateTeamScores();
+    final JPanel panel = teamScoresPanelBuilder.buildTeamScoresPanel(teamScores);
+    buttonPanel.add(panel, BorderLayout.NORTH);
+    buttonPanel.revalidate();
+    buttonPanel.repaint();
+  }
+
+  private void refreshTeamScoresPanel() {
+    if (!showingTeamScores) {
+      return;
+    }
+    renderTeamScoresPanel();
+  }
+
+  private Map<String, Double> calculateTeamScores() {
+    return calculateTeamScoresAcrossWeights(weightTabsController.getWeightSheetNames());
+  }
+
+  private Map<String, Double> calculateTeamScoresAcrossWeights(List<String> sheetNames) {
+    final Map<String, Double> teamScores = new HashMap<>();
+    if (seedingFilePath == null || sheetNames == null || sheetNames.isEmpty()) {
+      return teamScores;
+    }
+
+    for (String sheetName : sheetNames) {
+      try {
+        final List<Wrestler> seededWrestlers = seededWrestlerImporter.readSeededWrestlers(seedingFilePath, sheetName);
+        if (seededWrestlers.size() != EXPECTED_WRESTLER_COUNT) {
+          continue;
+        }
+
+        final ScoreBracketState state = buildScoreBracketState(seededWrestlers);
+        applyWinningSlots(state.bracketNodes, weightProgressBySheet.get(sheetName));
+        addMatchWinPoints(teamScores, state.bracketNodes);
+        addPlacementPoints(teamScores, state);
+      } catch (Exception ignored) {
+        // Skip sheets that fail to load while aggregating.
+      }
+    }
+
+    return teamScores;
+  }
+
+  private ScoreBracketState buildScoreBracketState(List<Wrestler> seededWrestlers) {
+    final Map<Integer, Wrestler> bySeed = mapBySeed(seededWrestlers);
+    final List<MatchNode> scoringNodes = new ArrayList<>();
+    final List<JLabel> scoringAllAmericanNodes = new ArrayList<>();
+    final BracketLayoutBuilder.LayoutResult layout = layoutBuilder.buildLayout(scoringNodes, scoringAllAmericanNodes);
+
+    final EnumMap<RoundDefinition, List<MatchNode>> rounds = layout.rounds();
+    final EnumMap<RoundDefinition, List<MatchNode>> consolationRounds = layout.consolationRounds();
+    final EnumMap<RoundDefinition, MatchNode> placementMatches = layout.placementMatches();
+
+    BracketConnectorService.seedOpeningMatches(bySeed, rounds.get(RoundDefinition.PIGTAIL), rounds.get(RoundDefinition.ROUND_OF_32));
+    BracketConnectorService.connectRounds(rounds, consolationRounds, placementMatches);
+
+    return new ScoreBracketState(
+      scoringNodes,
+      rounds.get(RoundDefinition.FINAL).get(0),
+      consolationRounds.get(RoundDefinition.THIRD_PLACE).get(0),
+      placementMatches.get(RoundDefinition.FIFTH_PLACE),
+      placementMatches.get(RoundDefinition.SEVENTH_PLACE)
+    );
+  }
+
+  private void applyWinningSlots(List<MatchNode> nodes, List<Integer> winningSlots) {
+    if (nodes == null || nodes.isEmpty() || winningSlots == null || winningSlots.isEmpty()) {
+      return;
+    }
+
+    int limit = Math.min(winningSlots.size(), nodes.size());
+    boolean progressed;
+    do {
+      progressed = false;
+      for (int i = 0; i < limit; i++) {
+        int winningSlot = winningSlots.get(i);
+        if (winningSlot != 1 && winningSlot != 2) {
+          continue;
+        }
+
+        MatchNode node = nodes.get(i);
+        if (node.isCompleted()) {
+          continue;
+        }
+
+        if (node.getMatch().getWrestlerOne() == null || node.getMatch().getWrestlerTwo() == null) {
+          continue;
+        }
+
+        advanceWinnerSilent(node, winningSlot);
+        progressed = true;
+      }
+    } while (progressed);
+  }
+
+  private void advanceWinnerSilent(MatchNode source, int winningSlot) {
+    source.markWinner(winningSlot);
+
+    final Wrestler winner = source.selectedWinner();
+    final Wrestler loser = source.selectedLoser();
+
+    assignWrestlerToTarget(source.getNextMatch(), source.getNextSlot(), winner);
+    assignWrestlerToTarget(source.getLoserNextMatch(), source.getLoserNextSlot(), loser);
+  }
+
+  private void addMatchWinPoints(Map<String, Double> teamScores, List<MatchNode> nodes) {
+    for (MatchNode node : nodes) {
+      if (!node.isCompleted()) {
+        continue;
+      }
+
+      final Wrestler winner = node.selectedWinner();
+      if (winner == null) {
+        continue;
+      }
+
+      final double winPoints = winPointsForSection(node.getBracketSection());
+      if (winPoints <= 0) {
+        continue;
+      }
+
+      addTeamPoints(teamScores, winner, winPoints);
+    }
+  }
+
+  private double winPointsForSection(BracketSection section) {
+    return switch (section) {
+      case CHAMPIONSHIP -> CHAMPIONSHIP_WIN_POINTS;
+      case CONSOLATION, PLACEMENT -> CONSOLATION_WIN_POINTS;
+      default -> 0.0;
+    };
+  }
+
+  private void addPlacementPoints(Map<String, Double> teamScores, ScoreBracketState state) {
+    addPlacementPointsForMatch(teamScores, state.finalMatchNode, 16, 12);
+    addPlacementPointsForMatch(teamScores, state.thirdPlaceMatchNode, 10, 9);
+    addPlacementPointsForMatch(teamScores, state.fifthPlaceMatchNode, 7, 6);
+    addPlacementPointsForMatch(teamScores, state.seventhPlaceMatchNode, 4, 3);
+  }
+
+  private void addPlacementPointsForMatch(
+    Map<String, Double> teamScores,
+    MatchNode matchNode,
+    double winnerPoints,
+    double loserPoints
+  ) {
+    if (matchNode == null || !matchNode.isCompleted()) {
+      return;
+    }
+    final Wrestler winner = matchNode.selectedWinner();
+    final Wrestler loser = matchNode.selectedLoser();
+    addTeamPoints(teamScores, winner, winnerPoints);
+    addTeamPoints(teamScores, loser, loserPoints);
+  }
+
+  private void addTeamPoints(Map<String, Double> teamScores, Wrestler wrestler, double points) {
+    if (wrestler == null) {
+      return;
+    }
+    final String team = wrestler.getTeam() == null ? "" : wrestler.getTeam().toString();
+    if (team.isBlank()) {
+      return;
+    }
+    teamScores.merge(team, points, Double::sum);
+  }
+
+  private static final class ScoreBracketState {
+    private final List<MatchNode> bracketNodes;
+    private final MatchNode finalMatchNode;
+    private final MatchNode thirdPlaceMatchNode;
+    private final MatchNode fifthPlaceMatchNode;
+    private final MatchNode seventhPlaceMatchNode;
+
+    private ScoreBracketState(
+      List<MatchNode> bracketNodes,
+      MatchNode finalMatchNode,
+      MatchNode thirdPlaceMatchNode,
+      MatchNode fifthPlaceMatchNode,
+      MatchNode seventhPlaceMatchNode
+    ) {
+      this.bracketNodes = bracketNodes;
+      this.finalMatchNode = finalMatchNode;
+      this.thirdPlaceMatchNode = thirdPlaceMatchNode;
+      this.fifthPlaceMatchNode = fifthPlaceMatchNode;
+      this.seventhPlaceMatchNode = seventhPlaceMatchNode;
+    }
   }
 
   private void refreshAllAmericansOverview() {

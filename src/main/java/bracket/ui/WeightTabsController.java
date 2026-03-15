@@ -22,6 +22,7 @@ public final class WeightTabsController {
   private final List<JButton> weightTabButtons = new ArrayList<>();
   private final List<String> weightSheetNames = new ArrayList<>();
   private JButton allAmericansTabButton;
+  private JButton teamScoresTabButton;
 
   public WeightTabsController(JPanel weightTabsPanel) {
     this.weightTabsPanel = weightTabsPanel;
@@ -32,8 +33,10 @@ public final class WeightTabsController {
     List<String> sheetNames,
     int maxTabs,
     String allAmericansLabel,
+    String teamScoresLabel,
     Consumer<String> onSelectSheet,
-    Runnable onShowAllAmericans
+    Runnable onShowAllAmericans,
+    Runnable onShowTeamScores
   ) {
     weightTabsPanel.removeAll();
     weightTabButtons.clear();
@@ -55,11 +58,16 @@ public final class WeightTabsController {
     styleWeightTabButton(allAmericansTabButton);
     weightTabsPanel.add(allAmericansTabButton);
 
+    teamScoresTabButton = new JButton(teamScoresLabel);
+    teamScoresTabButton.addActionListener(e -> onShowTeamScores.run());
+    styleWeightTabButton(teamScoresTabButton);
+    weightTabsPanel.add(teamScoresTabButton);
+
     weightTabsPanel.revalidate();
     weightTabsPanel.repaint();
   }
 
-  public void updateState(String selectedSheetName, boolean showingAllAmericans) {
+  public void updateState(String selectedSheetName, boolean showingAllAmericans, boolean showingTeamScores) {
     for (JButton tabButton : weightTabButtons) {
       final boolean selected = tabButton.getText().equals(selectedSheetName);
       tabButton.setEnabled(!selected);
@@ -68,6 +76,10 @@ public final class WeightTabsController {
     if (allAmericansTabButton != null) {
       allAmericansTabButton.setEnabled(!showingAllAmericans);
       applyWeightTabState(allAmericansTabButton, showingAllAmericans);
+    }
+    if (teamScoresTabButton != null) {
+      teamScoresTabButton.setEnabled(!showingTeamScores);
+      applyWeightTabState(teamScoresTabButton, showingTeamScores);
     }
   }
 

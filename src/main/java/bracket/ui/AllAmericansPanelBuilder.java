@@ -78,22 +78,7 @@ public final class AllAmericansPanelBuilder {
     section.add(headerRow);
     section.add(Box.createVerticalStrut(6));
 
-    for (int i = 1; i <= allAmericanCount; i++) {
-      final JPanel row = new JPanel();
-      row.setOpaque(false);
-      row.setLayout(new BorderLayout());
-      row.setAlignmentX(Component.CENTER_ALIGNMENT);
-      row.setPreferredSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
-      row.setMaximumSize(new Dimension(ROUND_COLUMN_WIDTH, WRESTLER_BUTTON_SIZE.height));
-
-      final JLabel node = createAllAmericanNode(i);
-      allAmericanNodes.add(node);
-      row.add(node, BorderLayout.CENTER);
-      section.add(row);
-      if (i < allAmericanCount) {
-        section.add(Box.createVerticalStrut(4));
-      }
-    }
+    appendAllAmericanRows(section, allAmericanNodes);
 
     return section;
   }
@@ -194,6 +179,13 @@ public final class AllAmericansPanelBuilder {
     column.add(Box.createVerticalStrut(6));
 
     final List<JLabel> nodes = new ArrayList<>();
+    appendAllAmericanRows(column, nodes);
+
+    nodesBySheet.put(sheetName, nodes);
+    return column;
+  }
+
+  private void appendAllAmericanRows(JPanel parent, List<JLabel> nodes) {
     for (int i = 1; i <= allAmericanCount; i++) {
       final JPanel row = new JPanel(new BorderLayout());
       row.setOpaque(false);
@@ -204,14 +196,11 @@ public final class AllAmericansPanelBuilder {
       final JLabel node = createAllAmericanNode(i);
       nodes.add(node);
       row.add(node, BorderLayout.CENTER);
-      column.add(row);
+      parent.add(row);
       if (i < allAmericanCount) {
-        column.add(Box.createVerticalStrut(4));
+        parent.add(Box.createVerticalStrut(4));
       }
     }
-
-    nodesBySheet.put(sheetName, nodes);
-    return column;
   }
 
   private JLabel createAllAmericanNode(int placement) {
