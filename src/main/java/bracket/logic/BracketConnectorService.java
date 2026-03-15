@@ -100,7 +100,8 @@ public final class BracketConnectorService {
       BracketConnector.connectWinner(consiRound1.get(i), consiRound2.get(i), 1);
     }
     for (int i = 0; i < roundOf16.size(); i++) {
-      BracketConnector.connectLoser(roundOf16.get(i), consiRound2.get(i), 2);
+      final int invertedIndex = consiRound2.size() - 1 - i;
+      BracketConnector.connectLoser(roundOf16.get(i), consiRound2.get(invertedIndex), 2);
     }
 
     BracketConnector.connectRounds(consiRound2, consiRound3);
@@ -108,8 +109,10 @@ public final class BracketConnectorService {
     for (int i = 0; i < consiRound3.size(); i++) {
       BracketConnector.connectWinner(consiRound3.get(i), bloodRound.get(i), 1);
     }
+    final int[] quarterToBloodIndex = {1, 0, 3, 2};
     for (int i = 0; i < quarterfinals.size(); i++) {
-      BracketConnector.connectLoser(quarterfinals.get(i), bloodRound.get(i), 2);
+      final int targetIndex = i < quarterToBloodIndex.length ? quarterToBloodIndex[i] : i;
+      BracketConnector.connectLoser(quarterfinals.get(i), bloodRound.get(targetIndex), 2);
     }
 
     BracketConnector.connectRounds(bloodRound, consiQuarterfinals);
@@ -120,7 +123,8 @@ public final class BracketConnectorService {
     }
 
     for (int i = 0; i < semifinals.size(); i++) {
-      BracketConnector.connectLoser(semifinals.get(i), consiSemifinals.get(i), 1);
+      final int invertedIndex = consiSemifinals.size() - 1 - i;
+      BracketConnector.connectLoser(semifinals.get(i), consiSemifinals.get(invertedIndex), 1);
     }
 
     for (int i = 0; i < consiSemifinals.size(); i++) {
