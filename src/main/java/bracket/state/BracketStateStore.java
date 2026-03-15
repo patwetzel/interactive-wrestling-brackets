@@ -237,6 +237,7 @@ public final class BracketStateStore {
     return copy;
   }
 
+
   private static final class SaveStateObjectInputStream extends ObjectInputStream {
     private SaveStateObjectInputStream(Path sourcePath) throws IOException {
       super(Files.newInputStream(sourcePath));

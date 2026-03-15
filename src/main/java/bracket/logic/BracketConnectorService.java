@@ -40,7 +40,7 @@ public final class BracketConnectorService {
     pigtailMatch.setWrestlerTwo(bySeed.get(32));
 
     final Match firstRoundTop = roundOf32.get(0).getMatch();
-    firstRoundTop.setWrestlerTwo(bySeed.get(1));
+    firstRoundTop.setWrestlerOne(bySeed.get(1));
 
     for (int i = 1; i < roundOf32.size(); i++) {
       final int firstSeed = ROUND_OF_32_SEED_ORDER[i - 1][0];
@@ -56,7 +56,7 @@ public final class BracketConnectorService {
     EnumMap<RoundDefinition, List<MatchNode>> consolationRounds,
     EnumMap<RoundDefinition, MatchNode> placementMatches
   ) {
-    BracketConnector.connectWinner(rounds.get(RoundDefinition.PIGTAIL).get(0), rounds.get(RoundDefinition.ROUND_OF_32).get(0), 1);
+    BracketConnector.connectWinner(rounds.get(RoundDefinition.PIGTAIL).get(0), rounds.get(RoundDefinition.ROUND_OF_32).get(0), 2);
     BracketConnector.connectRounds(rounds.get(RoundDefinition.ROUND_OF_32), rounds.get(RoundDefinition.ROUND_OF_16));
     BracketConnector.connectRounds(rounds.get(RoundDefinition.ROUND_OF_16), rounds.get(RoundDefinition.QUARTERFINALS));
     BracketConnector.connectRounds(rounds.get(RoundDefinition.QUARTERFINALS), rounds.get(RoundDefinition.SEMIFINALS));

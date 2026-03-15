@@ -289,13 +289,21 @@ public class Bracket {
   }
 
   private void loadWeightSheet(String sheetName) {
+    loadWeightSheet(sheetName, false);
+  }
+
+  private void loadWeightSheetForRestore(String sheetName) {
+    loadWeightSheet(sheetName, true);
+  }
+
+  private void loadWeightSheet(String sheetName, boolean skipSaveCurrent) {
     if (seedingFilePath == null) {
       return;
     }
 
     showingAllAmericans = false;
     showingTeamScores = false;
-    if (selectedSheetName != null && !selectedSheetName.equals(sheetName)) {
+    if (!skipSaveCurrent && selectedSheetName != null && !selectedSheetName.equals(sheetName)) {
       saveCurrentWeightProgress(selectedSheetName);
     }
 
@@ -849,7 +857,7 @@ public class Bracket {
       sheetNames,
       weightProgressBySheet,
       allAmericanLabelsBySheet,
-      this::loadWeightSheet
+      this::loadWeightSheetForRestore
     );
   }
 
@@ -876,7 +884,7 @@ public class Bracket {
       weightTabsController.getWeightSheetNames(),
       weightProgressBySheet,
       allAmericanLabelsBySheet,
-      this::loadWeightSheet
+      this::loadWeightSheetForRestore
     );
   }
 
